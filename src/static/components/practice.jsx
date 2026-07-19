@@ -117,7 +117,8 @@ function FeedbackPanel({ question, attempts }) {
   const { countWords, ScoreResult } = window.TW;
   const storageKey = `toeic-sw-writing-feedback-collapsed:${question.study4_test_id}:${question.question_number}`;
   const [isCollapsed, setIsCollapsed] = React.useState(() => localStorage.getItem(storageKey) !== "0");
-  const isStreaming = attempts.some((attempt) => attempt.score?.state === "streaming");
+  const attempt = attempts[attempts.length - 1];
+  const isStreaming = attempt?.score?.state === "streaming";
 
   React.useEffect(() => {
     if (!isStreaming || !isCollapsed) return;
@@ -139,34 +140,27 @@ function FeedbackPanel({ question, attempts }) {
     <section className="mt-3 rounded-lg border border-slate-200 bg-slate-50/60 p-2">
       <div className="flex items-center justify-between gap-3 text-sm text-slate-500">
         <strong>AI feedback</strong>
-        <div className="flex items-center gap-2">
-          <span>{attempts.length} attempts</span>
-          <button
-            className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-teal-700 hover:border-teal-700 hover:bg-teal-50"
-            type="button"
-            onClick={toggleCollapsed}
-          >
-            {isCollapsed ? "Show" : "Hide"}
-          </button>
-        </div>
+        <button
+          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-teal-700 hover:border-teal-700 hover:bg-teal-50"
+          type="button"
+          onClick={toggleCollapsed}
+        >
+          {isCollapsed ? "Show" : "Hide"}
+        </button>
       </div>
       {!isCollapsed ? (
         <div className="mt-2">
-          {attempts.length ? (
-            <div className="space-y-2">
-              {attempts.map((attempt, attemptIndex) => (
-                <section key={attempt.id} className="rounded-lg border border-slate-200 bg-white">
-                  <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-2.5 py-2 text-xs text-slate-500">
-                    <strong>Attempt {attemptIndex + 1}</strong>
-                    <span>{countWords(attempt.answer)} words · {attempt.answer.length} chars</span>
-                  </div>
-                  <p className="whitespace-pre-wrap border-b border-slate-200 px-2.5 py-2 text-sm text-slate-700">{attempt.answer}</p>
-                  <div className="px-2.5 pb-2">
-                    <ScoreResult score={attempt.score} />
-                  </div>
-                </section>
-              ))}
-            </div>
+          {attempt ? (
+            <section className="rounded-lg border border-slate-200 bg-white">
+              <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-2.5 py-2 text-xs text-slate-500">
+                <strong>Latest response</strong>
+                <span>{countWords(attempt.answer)} words · {attempt.answer.length} chars</span>
+              </div>
+              <p className="whitespace-pre-wrap border-b border-slate-200 px-2.5 py-2 text-sm text-slate-700">{attempt.answer}</p>
+              <div className="px-2.5 pb-2">
+                <ScoreResult score={attempt.score} />
+              </div>
+            </section>
           ) : (
             <div className="rounded-lg border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
               Save and score an answer to see feedback here.

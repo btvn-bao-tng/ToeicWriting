@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from ..deps import current_user
+from ..deps import current_user, remember_user
 from ..schemas import AuthRequest
 from ..services import auth as auth_service
 
@@ -14,14 +14,14 @@ router = APIRouter()
 @router.post("/api/auth/register")
 def register(body: AuthRequest, request: Request) -> dict[str, Any]:
     user = auth_service.register_user(body.username, body.password)
-    request.session["uid"] = user["id"]
+    remember_user(request, user)
     return user
 
 
 @router.post("/api/auth/login")
 def login(body: AuthRequest, request: Request) -> dict[str, Any]:
     user = auth_service.authenticate_user(body.username, body.password)
-    request.session["uid"] = user["id"]
+    remember_user(request, user)
     return user
 
 

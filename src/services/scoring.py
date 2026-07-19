@@ -4,17 +4,18 @@ import base64
 import mimetypes
 import urllib.error
 import urllib.request
+from functools import lru_cache
 from typing import Any
 
 from fastapi import HTTPException
 
 from ..config import MAX_IMAGE_ATTACHMENTS, MAX_IMAGE_BYTES, SYSTEM_PROMPT_DIR
-from ..database import db
-from ..repositories import tests as tests_repo
 from ..schemas import ScoreRequest
 from ..utils import decode_assets
+from . import content as content_service
 
 
+@lru_cache(maxsize=3)
 def system_prompt_for_part(part_order: int) -> str:
     prompt_path = SYSTEM_PROMPT_DIR / f"part{part_order}.md"
     prompt = (
@@ -118,8 +119,7 @@ def score_context(request: ScoreRequest) -> tuple[int, int, str, Any]:
     if not answer:
         raise HTTPException(status_code=400, detail="Answer is empty")
 
-    with db() as conn:
-        row = tests_repo.find_question(conn, request.study4_test_id, request.question_number)
+    row = content_service.find_question(request.study4_test_id, request.question_number)
 
     if row is None:
         raise HTTPException(status_code=404, detail="Question not found")

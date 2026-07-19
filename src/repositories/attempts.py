@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from ..database import Attempt
@@ -61,6 +61,12 @@ def mark_error(
 def list_attempts(
     conn: Session, user_id: int, study4_test_id: int
 ) -> list[dict[str, Any]]:
+    latest_ids = (
+        select(func.max(Attempt.id).label("id"))
+        .where(Attempt.user_id == user_id, Attempt.study4_test_id == study4_test_id)
+        .group_by(Attempt.question_number)
+    ).subquery()
+
     rows = conn.execute(
         select(
             Attempt.id,
@@ -71,8 +77,8 @@ def list_attempts(
             Attempt.model,
             Attempt.created_at,
         )
-        .where(Attempt.user_id == user_id, Attempt.study4_test_id == study4_test_id)
-        .order_by(Attempt.question_number, Attempt.id)
+        .join(latest_ids, Attempt.id == latest_ids.c.id)
+        .order_by(Attempt.question_number)
     ).all()
     return [dict(row._mapping) for row in rows]
 

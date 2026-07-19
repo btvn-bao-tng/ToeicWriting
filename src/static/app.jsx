@@ -312,7 +312,7 @@ window.TW.App = function App() {
       score: { state: "streaming", text: "## Scoring\n\nWaiting for the first tokens..." },
     };
 
-    setAttempts((previous) => ({ ...previous, [key]: [...(previous[key] || []), attempt] }));
+    setAttempts((previous) => ({ ...previous, [key]: [attempt] }));
     setScoringNumbers((previous) => new Set(previous).add(question.question_number));
 
     try {

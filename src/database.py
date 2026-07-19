@@ -16,7 +16,14 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
-from .config import DATABASE_URL, DB_PATH
+from .config import (
+    DATABASE_URL,
+    DB_MAX_OVERFLOW,
+    DB_PATH,
+    DB_POOL_PRE_PING,
+    DB_POOL_RECYCLE_SECONDS,
+    DB_POOL_SIZE,
+)
 
 
 def _normalize_database_url(url: str) -> str:
@@ -30,9 +37,17 @@ def _normalize_database_url(url: str) -> str:
 SQLALCHEMY_DATABASE_URL = _normalize_database_url(DATABASE_URL)
 IS_SQLITE = SQLALCHEMY_DATABASE_URL.startswith("sqlite")
 
-engine_args: dict[str, Any] = {"pool_pre_ping": True}
+engine_args: dict[str, Any] = {"pool_pre_ping": DB_POOL_PRE_PING}
 if IS_SQLITE:
     engine_args["connect_args"] = {"check_same_thread": False, "timeout": 10}
+else:
+    engine_args.update(
+        {
+            "pool_size": DB_POOL_SIZE,
+            "max_overflow": DB_MAX_OVERFLOW,
+            "pool_recycle": DB_POOL_RECYCLE_SECONDS,
+        }
+    )
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL, **engine_args)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
@@ -237,8 +252,7 @@ def init_db() -> None:
     Base.metadata.create_all(bind=engine)
 
 
-@contextmanager
-def db() -> Generator[Session, None, None]:
+def get_db() -> Generator[Session, None, None]:
     session = SessionLocal()
     try:
         yield session
@@ -248,3 +262,6 @@ def db() -> Generator[Session, None, None]:
         raise
     finally:
         session.close()
+
+
+db = contextmanager(get_db)
