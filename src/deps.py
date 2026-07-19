@@ -75,6 +75,10 @@ def require_user(request: Request) -> dict[str, Any]:
     return user
 
 
+def optional_user(request: Request) -> dict[str, Any] | None:
+    return current_user(request)
+
+
 def require_user_with_db(
     request: Request,
     conn: Session = Depends(db_session),

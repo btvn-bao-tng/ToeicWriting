@@ -1,4 +1,4 @@
-window.TW.Header = function Header({ status, user, onLogout }) {
+window.TW.Header = function Header({ status, user, onLogout, onLogin }) {
   return (
     <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="mx-auto flex min-h-12 max-w-5xl items-center justify-between gap-4 px-4 py-2 max-[860px]:min-h-0">
@@ -16,7 +16,15 @@ window.TW.Header = function Header({ status, user, onLogout }) {
                 Logout
               </button>
             </>
-          ) : null}
+          ) : (
+            <button
+              className="rounded-md border border-teal-700 bg-teal-700 px-2 py-1 text-xs font-bold text-white hover:bg-teal-800"
+              type="button"
+              onClick={onLogin}
+            >
+              Login with Gmail
+            </button>
+          )}
         </div>
       </div>
     </header>

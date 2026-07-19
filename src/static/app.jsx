@@ -100,20 +100,18 @@ window.TW.App = function App() {
   useEffect(() => {
     async function boot() {
       try {
-        const user = await apiJson("/api/auth/me");
+        const user = await apiJson("/api/auth/me", { suppressAuthExpired: true });
         setCurrentUser(user);
-        setAuthChecked(true);
-        await loadTests();
-        const initialRoute = parseHash();
-        if (initialRoute.testId) {
-          await loadTest(initialRoute.testId, { view: initialRoute.view, remember: false, mockExamId: initialRoute.mockExamId });
-        }
       } catch (error) {
-        setAuthChecked(true);
-        setStatus(error.status === 401 ? "Login required" : "Session unavailable");
         if (error.status && error.status !== 401) {
           setLoadError(`Could not check session: ${error.message}`);
         }
+      }
+      setAuthChecked(true);
+      await loadTests();
+      const initialRoute = parseHash();
+      if (initialRoute.testId) {
+        await loadTest(initialRoute.testId, { view: initialRoute.view, remember: false, mockExamId: initialRoute.mockExamId });
       }
     }
     boot();
@@ -121,7 +119,15 @@ window.TW.App = function App() {
 
   useEffect(() => {
     function handleAuthExpired() {
-      clearAppState("Login required");
+      Object.values(draftTimers.current).forEach(clearTimeout);
+      draftTimers.current = {};
+      pendingDrafts.current = {};
+      setCurrentUser(null);
+      setDrafts({});
+      setAttempts({});
+      setScoringNumbers(new Set());
+      setScoringVisible(false);
+      setStatus("Session expired. Log in to score and save.");
     }
     window.addEventListener("tw-auth-expired", handleAuthExpired);
     return () => window.removeEventListener("tw-auth-expired", handleAuthExpired);
@@ -209,7 +215,6 @@ window.TW.App = function App() {
 
     try {
       const payload = await apiJson(`/api/tests/${id}`);
-      const progress = await apiJson(`/api/progress?study4_test_id=${encodeURIComponent(id)}`);
       const nextDrafts = {};
       const nextAttempts = {};
 
@@ -219,14 +224,17 @@ window.TW.App = function App() {
         nextAttempts[key] = [];
       });
 
-      (progress.drafts || []).forEach((draft) => {
-        nextDrafts[`${id}:${draft.question_number}`] = draft.body || "";
-      });
+      if (currentUser) {
+        const progress = await apiJson(`/api/progress?study4_test_id=${encodeURIComponent(id)}`);
+        (progress.drafts || []).forEach((draft) => {
+          nextDrafts[`${id}:${draft.question_number}`] = draft.body || "";
+        });
 
-      (progress.attempts || []).forEach((attempt) => {
-        const key = `${id}:${attempt.question_number}`;
-        nextAttempts[key] = [...(nextAttempts[key] || []), scoreFromRow(attempt)];
-      });
+        (progress.attempts || []).forEach((attempt) => {
+          const key = `${id}:${attempt.question_number}`;
+          nextAttempts[key] = [...(nextAttempts[key] || []), scoreFromRow(attempt)];
+        });
+      }
 
       setCurrentPayload(payload);
       setDrafts(nextDrafts);
@@ -290,6 +298,7 @@ window.TW.App = function App() {
   }
 
   function scheduleDraftSave(question, value) {
+    if (!currentUser) return;
     const key = progressKey(question);
     pendingDrafts.current[key] = { question, value };
     clearTimeout(draftTimers.current[key]);
@@ -327,10 +336,12 @@ window.TW.App = function App() {
 
   async function handleClear(question) {
     rememberQuestion(question);
-    await apiJson(`/api/progress?study4_test_id=${encodeURIComponent(question.study4_test_id)}&question_number=${encodeURIComponent(question.question_number)}`, {
-      method: "DELETE",
-    });
     const key = progressKey(question);
+    if (currentUser) {
+      await apiJson(`/api/progress?study4_test_id=${encodeURIComponent(question.study4_test_id)}&question_number=${encodeURIComponent(question.question_number)}`, {
+        method: "DELETE",
+      });
+    }
     clearTimeout(draftTimers.current[key]);
     delete draftTimers.current[key];
     delete pendingDrafts.current[key];
@@ -349,6 +360,10 @@ window.TW.App = function App() {
   }
 
   async function handleScore(question) {
+    if (!currentUser) {
+      window.location.href = "/api/auth/google/login";
+      return;
+    }
     rememberQuestion(question);
     const answer = getDraft(question);
     const key = progressKey(question);
@@ -405,6 +420,10 @@ window.TW.App = function App() {
   }
 
   async function handleScoreVisible() {
+    if (!currentUser) {
+      window.location.href = "/api/auth/google/login";
+      return;
+    }
     setScoringVisible(true);
     try {
       for (const question of questions) {
@@ -427,13 +446,26 @@ window.TW.App = function App() {
     }
   }
 
+  function handleLogin() {
+    window.location.href = "/api/auth/google/login";
+  }
+
   async function handleLogout() {
     try {
       await apiJson("/api/auth/logout", { method: "POST" });
     } catch (_error) {
-      // The local UI can still return to the auth screen if the session is already gone.
+      // The local UI can still return to the test list if the session is already gone.
     }
-    clearAppState("Logged out");
+    Object.values(draftTimers.current).forEach(clearTimeout);
+    draftTimers.current = {};
+    pendingDrafts.current = {};
+    setCurrentUser(null);
+    setDrafts({});
+    setAttempts({});
+    setScoringNumbers(new Set());
+    setScoringVisible(false);
+    navigate({ view: "tests", testId: null, mockExamId: null });
+    setStatus("Logged out");
   }
 
   if (!authChecked) {
@@ -447,17 +479,26 @@ window.TW.App = function App() {
     );
   }
 
-  if (!currentUser) {
-    return <AuthScreen />;
-  }
-
   const { view, testId, mockExamId } = route;
+  const isGuest = !currentUser;
 
   return (
     <>
-      <Header status={status} user={currentUser} onLogout={handleLogout} />
+      <Header status={status} user={currentUser} onLogout={handleLogout} onLogin={handleLogin} />
       <main className="p-6">
         <section className="mx-auto min-w-0 max-w-5xl">
+          {isGuest ? (
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              <span>Browsing as a guest. Log in to score answers and save your progress.</span>
+              <button
+                type="button"
+                onClick={handleLogin}
+                className="min-h-8 rounded-md border border-amber-300 bg-white px-3 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100"
+              >
+                Login with Gmail
+              </button>
+            </div>
+          ) : null}
           {loadError ? <EmptyState error>{loadError}</EmptyState> : null}
           {!loadError && loadingTest ? <EmptyState>Loading test...</EmptyState> : null}
 
@@ -491,6 +532,8 @@ window.TW.App = function App() {
                 onScoreVisible={handleScoreVisible}
                 onClearVisible={handleClearVisible}
                 scoringVisible={scoringVisible}
+                allowScoring={!isGuest}
+                onLogin={handleLogin}
               />
               {questions.length ? (
                 questions.map((question, index) => (
@@ -506,6 +549,8 @@ window.TW.App = function App() {
                     onScore={handleScore}
                     onClear={handleClear}
                     onActivate={rememberQuestion}
+                    allowScoring={!isGuest}
+                    onLogin={handleLogin}
                   />
                 ))
               ) : (
@@ -515,14 +560,27 @@ window.TW.App = function App() {
           ) : null}
 
           {!loadError && !loadingTest && view === "mock" && currentPayload ? (
-            <MockExamScreen
-              currentPayload={currentPayload}
-              initialMockExamId={mockExamId}
-              onStatus={setStatus}
-              onLeave={() => navigate({ view: "actions", testId: currentPayload.test.study4_test_id, mockExamId: null })}
-              onStartMockExam={(id) => navigate({ view: "mock", testId: currentPayload.test.study4_test_id, mockExamId: id })}
-              onNewMockExam={() => navigate({ view: "mock", testId: currentPayload.test.study4_test_id, mockExamId: null })}
-            />
+            isGuest ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-center">
+                <p className="mb-3 text-sm text-amber-800">Mock exams require login. Log in to start a timed mock exam.</p>
+                <button
+                  type="button"
+                  onClick={handleLogin}
+                  className="min-h-10 rounded-md border border-teal-700 bg-teal-700 px-4 py-2 text-sm font-bold text-white hover:bg-teal-800"
+                >
+                  Login with Gmail
+                </button>
+              </div>
+            ) : (
+              <MockExamScreen
+                currentPayload={currentPayload}
+                initialMockExamId={mockExamId}
+                onStatus={setStatus}
+                onLeave={() => navigate({ view: "actions", testId: currentPayload.test.study4_test_id, mockExamId: null })}
+                onStartMockExam={(id) => navigate({ view: "mock", testId: currentPayload.test.study4_test_id, mockExamId: id })}
+                onNewMockExam={() => navigate({ view: "mock", testId: currentPayload.test.study4_test_id, mockExamId: null })}
+              />
+            )
           ) : null}
         </section>
       </main>

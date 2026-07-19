@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from ..deps import require_user
+from ..deps import optional_user
 from ..services import content as content_service
 
 router = APIRouter()
@@ -12,7 +12,7 @@ router = APIRouter()
 
 @router.get("/api/tests")
 def list_tests(
-    user: dict[str, Any] = Depends(require_user),
+    user: dict[str, Any] | None = Depends(optional_user),
 ) -> list[dict[str, Any]]:
     return content_service.list_tests()
 
@@ -20,7 +20,7 @@ def list_tests(
 @router.get("/api/tests/{study4_test_id}")
 def get_test(
     study4_test_id: int,
-    user: dict[str, Any] = Depends(require_user),
+    user: dict[str, Any] | None = Depends(optional_user),
 ) -> dict[str, Any]:
     payload = content_service.get_test_payload(study4_test_id)
     if payload is None:

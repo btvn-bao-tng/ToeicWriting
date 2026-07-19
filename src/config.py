@@ -17,7 +17,7 @@ if load_dotenv:
 
 DB_PATH = ROOT / "data" / "database.db"
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
-DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "10"))
+DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "2"))
 DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "0"))
 DB_POOL_RECYCLE_SECONDS = int(os.getenv("DB_POOL_RECYCLE_SECONDS", "1800"))
 DB_POOL_PRE_PING = os.getenv("DB_POOL_PRE_PING", "false").strip().lower() in (

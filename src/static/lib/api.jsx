@@ -8,7 +8,7 @@ window.TW.apiFetch = async function apiFetch(url, options = {}) {
     },
   });
 
-  if (response.status === 401) {
+  if (response.status === 401 && !options.suppressAuthExpired) {
     window.dispatchEvent(new CustomEvent("tw-auth-expired"));
   }
 

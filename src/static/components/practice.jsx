@@ -16,7 +16,7 @@ window.TW.TestSummary = function TestSummary({ test, questions, modeLabel }) {
   );
 };
 
-window.TW.PartTabs = function PartTabs({ payload, selectedPart, onSelectPart, onScoreVisible, onClearVisible, scoringVisible }) {
+window.TW.PartTabs = function PartTabs({ payload, selectedPart, onSelectPart, onScoreVisible, onClearVisible, scoringVisible, allowScoring = true, onLogin }) {
   const { PART_BUTTON_BASE, PART_BUTTON_ACTIVE } = window.TW.classes;
   const { partName } = window.TW;
   const parts = payload.parts || [];
@@ -43,14 +43,24 @@ window.TW.PartTabs = function PartTabs({ payload, selectedPart, onSelectPart, on
         ))}
       </div>
       <div className="flex flex-wrap justify-end gap-1.5 max-[860px]:justify-start">
-        <button
-          className="min-h-9 rounded-md border border-teal-700 bg-teal-700 px-3 py-1.5 text-sm font-bold text-white hover:bg-teal-800 disabled:cursor-wait disabled:opacity-70"
-          type="button"
-          disabled={scoringVisible}
-          onClick={onScoreVisible}
-        >
-          {scoringVisible ? "Scoring..." : "Score visible drafts"}
-        </button>
+        {allowScoring ? (
+          <button
+            className="min-h-9 rounded-md border border-teal-700 bg-teal-700 px-3 py-1.5 text-sm font-bold text-white hover:bg-teal-800 disabled:cursor-wait disabled:opacity-70"
+            type="button"
+            disabled={scoringVisible}
+            onClick={onScoreVisible}
+          >
+            {scoringVisible ? "Scoring..." : "Score visible drafts"}
+          </button>
+        ) : (
+          <button
+            className="min-h-9 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-bold text-teal-700 hover:border-teal-700 hover:bg-teal-50"
+            type="button"
+            onClick={onLogin}
+          >
+            Login to score
+          </button>
+        )}
         <button
           className="min-h-9 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 hover:border-teal-700 hover:bg-teal-50 hover:text-teal-950"
           type="button"
@@ -86,6 +96,7 @@ window.TW.AnswerBox = function AnswerBox({
   onScore,
   onClear,
   saveLabel = "Draft saved to your account",
+  onLogin,
 }) {
   const { countWords } = window.TW;
   const partHeight = part?.sort_order === 2 ? "min-h-[180px]" : part?.sort_order === 3 ? "min-h-[260px]" : "min-h-28";
@@ -114,6 +125,17 @@ window.TW.AnswerBox = function AnswerBox({
                 onClick={() => onScore(question)}
               >
                 {isScoring ? "Scoring..." : "Save & score"}
+              </button>
+              {" · "}
+            </>
+          ) : onLogin ? (
+            <>
+              <button
+                className="bg-transparent p-0 text-xs font-bold text-teal-700 hover:underline"
+                type="button"
+                onClick={onLogin}
+              >
+                Login to score
               </button>
               {" · "}
             </>
@@ -199,6 +221,7 @@ window.TW.QuestionCard = function QuestionCard({
   onClear,
   onActivate,
   saveLabel,
+  onLogin,
 }) {
   const { AnswerBox, partForQuestion, partName } = window.TW;
   const { PILL_CLASS } = window.TW.classes;
@@ -240,6 +263,7 @@ window.TW.QuestionCard = function QuestionCard({
             onScore={onScore}
             onClear={onClear}
             saveLabel={saveLabel}
+            onLogin={onLogin}
           />
         </div>
         <FeedbackPanel question={question} attempts={attempts} />
