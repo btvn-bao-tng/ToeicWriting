@@ -1,7 +1,6 @@
 window.TW = window.TW || {};
 
 window.TW.classes = {
-  TEST_BUTTON_BASE: "grid w-full grid-cols-[1fr_auto] items-center gap-2 border-b border-slate-200 px-2 py-2.5 text-left text-slate-900 hover:bg-teal-50",
   PILL_CLASS: "rounded-full border border-slate-200 bg-white px-2.5 py-1 text-sm text-slate-500",
   PART_BUTTON_BASE: "min-h-9 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 hover:border-teal-700 hover:bg-teal-50 hover:text-teal-950",
   PART_BUTTON_ACTIVE: "border-teal-700 bg-teal-50 text-teal-950",
@@ -58,4 +57,21 @@ window.TW.readJsonLocal = function readJsonLocal(key, fallback) {
 
 window.TW.writeJsonLocal = function writeJsonLocal(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
+};
+
+window.TW.isImageInputError = function isImageInputError(message) {
+  if (!message) return false;
+  const text = String(message).toLowerCase();
+  return (
+    text.includes("does not support image") ||
+    text.includes("cannot read") && text.includes("image") ||
+    text.includes("image input") ||
+    text.includes("vision") ||
+    text.includes("image_url") ||
+    text.includes("multipart")
+  );
+};
+
+window.TW.imageInputErrorMessage = function imageInputErrorMessage() {
+  return "The current AI model does not support image input, so picture-based questions (Part 1) cannot be scored automatically.";
 };

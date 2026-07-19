@@ -9,6 +9,7 @@ from .config import STATIC_PATH
 from .database import engine, init_db
 from .middleware import register_middleware
 from .routers import auth as auth_router
+from .routers import mock_exams as mock_exams_router
 from .routers import pages as pages_router
 from .routers import progress as progress_router
 from .routers import score as score_router
@@ -25,6 +26,7 @@ app.include_router(tests_router.router)
 app.include_router(auth_router.router)
 app.include_router(progress_router.router)
 app.include_router(score_router.router)
+app.include_router(mock_exams_router.router)
 
 
 @app.on_event("startup")

@@ -76,7 +76,17 @@ function PromptHtml({ html, text }) {
   return <p className="mb-2.5 last:mb-0">{text}</p>;
 }
 
-window.TW.AnswerBox = function AnswerBox({ question, part, draft, isScoring, onDraftChange, onScore, onClear }) {
+window.TW.AnswerBox = function AnswerBox({
+  question,
+  part,
+  draft,
+  isScoring,
+  allowScoring = true,
+  onDraftChange,
+  onScore,
+  onClear,
+  saveLabel = "Draft saved to your account",
+}) {
   const { countWords } = window.TW;
   const partHeight = part?.sort_order === 2 ? "min-h-[180px]" : part?.sort_order === 3 ? "min-h-[260px]" : "min-h-28";
 
@@ -93,17 +103,21 @@ window.TW.AnswerBox = function AnswerBox({ question, part, draft, isScoring, onD
         onChange={(event) => onDraftChange(question, event.target.value)}
       />
       <div className="mt-1.5 flex items-center justify-between gap-3 text-xs text-slate-500">
-        <span>Draft saved to your account</span>
+        <span>{saveLabel}</span>
         <span>
-          <button
-            className="bg-transparent p-0 text-xs font-bold text-teal-700 hover:underline disabled:cursor-wait disabled:opacity-70"
-            type="button"
-            disabled={isScoring}
-            onClick={() => onScore(question)}
-          >
-            {isScoring ? "Scoring..." : "Save & score"}
-          </button>
-          {" · "}
+          {allowScoring ? (
+            <>
+              <button
+                className="bg-transparent p-0 text-xs font-bold text-teal-700 hover:underline disabled:cursor-wait disabled:opacity-70"
+                type="button"
+                disabled={isScoring}
+                onClick={() => onScore(question)}
+              >
+                {isScoring ? "Scoring..." : "Save & score"}
+              </button>
+              {" · "}
+            </>
+          ) : null}
           <button className="bg-transparent p-0 text-xs font-bold text-teal-700 hover:underline" type="button" onClick={() => onClear(question)}>
             Clear
           </button>
@@ -172,7 +186,20 @@ function FeedbackPanel({ question, attempts }) {
   );
 }
 
-window.TW.QuestionCard = function QuestionCard({ question, index, parts, draft, attempts, isScoring, onDraftChange, onScore, onClear, onActivate }) {
+window.TW.QuestionCard = function QuestionCard({
+  question,
+  index,
+  parts,
+  draft,
+  attempts,
+  isScoring,
+  allowScoring = true,
+  onDraftChange,
+  onScore,
+  onClear,
+  onActivate,
+  saveLabel,
+}) {
   const { AnswerBox, partForQuestion, partName } = window.TW;
   const { PILL_CLASS } = window.TW.classes;
   const assets = Array.isArray(question.asset_urls) ? question.asset_urls : [];
@@ -208,9 +235,11 @@ window.TW.QuestionCard = function QuestionCard({ question, index, parts, draft, 
             part={part}
             draft={draft}
             isScoring={isScoring}
+            allowScoring={allowScoring}
             onDraftChange={onDraftChange}
             onScore={onScore}
             onClear={onClear}
+            saveLabel={saveLabel}
           />
         </div>
         <FeedbackPanel question={question} attempts={attempts} />

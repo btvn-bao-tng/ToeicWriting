@@ -244,6 +244,76 @@ class Attempt(Base):
     updated_at: Mapped[str] = mapped_column(String, nullable=False)
 
 
+class MockExam(Base):
+    __tablename__ = "mock_exams"
+    __table_args__ = (
+        Index("idx_mock_exams_user", "user_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    study4_test_id: Mapped[int] = mapped_column(nullable=False)
+    selected_part: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String, nullable=False, default="in_progress", server_default="in_progress"
+    )
+    raw_score: Mapped[float | None] = mapped_column(nullable=True)
+    scaled_score: Mapped[int | None] = mapped_column(nullable=True)
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+    updated_at: Mapped[str] = mapped_column(String, nullable=False)
+    completed_at: Mapped[str | None] = mapped_column(nullable=True)
+
+
+class MockExamDraft(Base):
+    __tablename__ = "mock_exam_drafts"
+    __table_args__ = (
+        UniqueConstraint("mock_exam_id", "question_number"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    mock_exam_id: Mapped[int] = mapped_column(
+        ForeignKey("mock_exams.id", ondelete="CASCADE"), nullable=False
+    )
+    question_number: Mapped[int] = mapped_column(nullable=False)
+    body: Mapped[str] = mapped_column(
+        Text, nullable=False, default="", server_default=""
+    )
+    updated_at: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class MockExamAttempt(Base):
+    __tablename__ = "mock_exam_attempts"
+    __table_args__ = (
+        Index(
+            "idx_mock_exam_attempts_exam_q",
+            "mock_exam_id",
+            "question_number",
+            "id",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    mock_exam_id: Mapped[int] = mapped_column(
+        ForeignKey("mock_exams.id", ondelete="CASCADE"), nullable=False
+    )
+    question_number: Mapped[int] = mapped_column(nullable=False)
+    answer: Mapped[str] = mapped_column(Text, nullable=False)
+    score_text: Mapped[str] = mapped_column(
+        Text, nullable=False, default="", server_default=""
+    )
+    score_state: Mapped[str] = mapped_column(
+        String, nullable=False, default="streaming", server_default="streaming"
+    )
+    score_10: Mapped[float | None] = mapped_column(nullable=True)
+    converted_score: Mapped[float | None] = mapped_column(nullable=True)
+    max_score: Mapped[int | None] = mapped_column(nullable=True)
+    model: Mapped[str | None] = mapped_column(String)
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+    updated_at: Mapped[str] = mapped_column(String, nullable=False)
+
+
 def init_db() -> None:
     if IS_SQLITE:
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)

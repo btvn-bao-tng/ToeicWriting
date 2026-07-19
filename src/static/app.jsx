@@ -4,6 +4,25 @@ const LAST_TEST_KEY = "toeic-sw-writing-last-test-id";
 const LAST_PART_KEY = "toeic-sw-writing-last-part";
 const LAST_QUESTION_KEY = "toeic-sw-writing-last-question-number";
 
+function parseHash() {
+  const raw = (window.location.hash || "#/tests").replace(/^#/, "");
+  const segments = raw.split("/").filter(Boolean);
+  if (segments[0] !== "tests") return { view: "tests", testId: null, mockExamId: null };
+  const testId = segments[1] ? Number(segments[1]) : null;
+  const view = segments[2] || "actions";
+  const mockExamId = segments[3] ? Number(segments[3]) : null;
+  if (!testId) return { view: "tests", testId: null, mockExamId: null };
+  if (!["actions", "practice", "mock"].includes(view)) return { view: "actions", testId, mockExamId: null };
+  return { view, testId, mockExamId };
+}
+
+function buildHash({ view, testId, mockExamId }) {
+  if (!testId) return "#/tests";
+  if (view === "mock" && mockExamId) return `#/tests/${testId}/mock/${mockExamId}`;
+  if (view === "actions") return `#/tests/${testId}`;
+  return `#/tests/${testId}/${view}`;
+}
+
 function visibleQuestions(payload, selectedPart) {
   const questions = payload?.questions || [];
   if (selectedPart === "all") return questions;
@@ -32,12 +51,14 @@ function scoreFromRow(row) {
 window.TW.App = function App() {
   const {
     Header,
-    Sidebar,
     EmptyState,
     TestSummary,
     PartTabs,
     QuestionCard,
     AuthScreen,
+    MockExamScreen,
+    TestList,
+    TestActions,
     apiFetch,
     apiJson,
     partName,
@@ -49,6 +70,7 @@ window.TW.App = function App() {
   const [tests, setTests] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [selectedPart, setSelectedPart] = useState(() => localStorage.getItem(LAST_PART_KEY) || "all");
+  const [route, setRoute] = useState(parseHash);
   const [currentPayload, setCurrentPayload] = useState(null);
   const [status, setStatus] = useState("Checking session...");
   const [loadError, setLoadError] = useState("");
@@ -60,6 +82,14 @@ window.TW.App = function App() {
   const [lastQuestionNumber, setLastQuestionNumber] = useState(() => Number(localStorage.getItem(LAST_QUESTION_KEY)) || null);
   const draftTimers = useRef({});
   const pendingDrafts = useRef({});
+
+  function navigate(nextRoute) {
+    const hash = buildHash(nextRoute);
+    if (window.location.hash !== hash) {
+      window.location.hash = hash;
+    }
+    setRoute(nextRoute);
+  }
 
   const questions = useMemo(() => visibleQuestions(currentPayload, selectedPart), [currentPayload, selectedPart]);
   const parts = currentPayload?.parts || [];
@@ -74,6 +104,10 @@ window.TW.App = function App() {
         setCurrentUser(user);
         setAuthChecked(true);
         await loadTests();
+        const initialRoute = parseHash();
+        if (initialRoute.testId) {
+          await loadTest(initialRoute.testId, { view: initialRoute.view, remember: false, mockExamId: initialRoute.mockExamId });
+        }
       } catch (error) {
         setAuthChecked(true);
         setStatus(error.status === 401 ? "Login required" : "Session unavailable");
@@ -92,6 +126,18 @@ window.TW.App = function App() {
     window.addEventListener("tw-auth-expired", handleAuthExpired);
     return () => window.removeEventListener("tw-auth-expired", handleAuthExpired);
   }, []);
+
+  useEffect(() => {
+    function onHashChange() {
+      const nextRoute = parseHash();
+      setRoute(nextRoute);
+      if (nextRoute.testId && nextRoute.testId !== selectedId) {
+        loadTest(nextRoute.testId, { view: nextRoute.view, remember: false, mockExamId: nextRoute.mockExamId });
+      }
+    }
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, [selectedId]);
 
   useEffect(() => {
     function flushOnLeave() {
@@ -137,6 +183,7 @@ window.TW.App = function App() {
     setScoringVisible(false);
     setLoadError("");
     setLoadingTest(false);
+    setRoute({ view: "tests", testId: null, mockExamId: null });
     setStatus(nextStatus);
   }
 
@@ -144,15 +191,6 @@ window.TW.App = function App() {
     const nextTests = await apiJson("/api/tests");
     setTests(nextTests);
     setStatus(`${nextTests.length} tests loaded`);
-    const savedId = Number(localStorage.getItem(LAST_TEST_KEY));
-    const savedTest = nextTests.find((test) => test.study4_test_id === savedId);
-    const initialId = savedTest?.study4_test_id ?? nextTests[0]?.study4_test_id ?? null;
-    if (initialId) {
-      await loadTest(initialId, {
-        part: localStorage.getItem(LAST_PART_KEY) || "all",
-        remember: false,
-      });
-    }
   }
 
   async function loadTest(id, options = {}) {
@@ -210,6 +248,23 @@ window.TW.App = function App() {
   function handleSelectPart(part) {
     localStorage.setItem(LAST_PART_KEY, part);
     setSelectedPart(part);
+  }
+
+  async function handleSelectTest(id) {
+    navigate({ view: "actions", testId: id, mockExamId: null });
+    await loadTest(id, { view: "actions" });
+  }
+
+  function handleStartPractice() {
+    if (!currentPayload) return;
+    const nextPart = localStorage.getItem(LAST_PART_KEY) || "all";
+    setSelectedPart(nextPart);
+    navigate({ view: "practice", testId: currentPayload.test.study4_test_id, mockExamId: null });
+  }
+
+  function handleStartMock() {
+    if (!currentPayload) return;
+    navigate({ view: "mock", testId: currentPayload.test.study4_test_id, mockExamId: null });
   }
 
   function getDraft(question) {
@@ -366,6 +421,10 @@ window.TW.App = function App() {
     setLoadError("");
     setStatus("Loading database...");
     await loadTests();
+    const initialRoute = parseHash();
+    if (initialRoute.testId) {
+      await loadTest(initialRoute.testId, { view: initialRoute.view, remember: false, mockExamId: initialRoute.mockExamId });
+    }
   }
 
   async function handleLogout() {
@@ -392,17 +451,38 @@ window.TW.App = function App() {
     return <AuthScreen onAuthenticated={handleAuthenticated} />;
   }
 
+  const { view, testId, mockExamId } = route;
+
   return (
     <>
       <Header status={status} user={currentUser} onLogout={handleLogout} />
-      <main className="grid w-full grid-cols-[minmax(220px,1fr)_minmax(0,4fr)] gap-6 p-6 max-[860px]:grid-cols-1">
-        <Sidebar tests={tests} selectedId={selectedId} onSelect={(id) => loadTest(id, { part: "all" })} />
-        <section className="min-w-0">
+      <main className="p-6">
+        <section className="mx-auto min-w-0 max-w-5xl">
           {loadError ? <EmptyState error>{loadError}</EmptyState> : null}
-          {!loadError && loadingTest ? <EmptyState>Loading questions...</EmptyState> : null}
-          {!loadError && !loadingTest && !currentPayload ? <EmptyState>Loading tests...</EmptyState> : null}
-          {!loadError && !loadingTest && currentPayload ? (
+          {!loadError && loadingTest ? <EmptyState>Loading test...</EmptyState> : null}
+
+          {!loadError && !loadingTest && view === "tests" ? (
+            <TestList tests={tests} selectedId={selectedId} onSelect={handleSelectTest} />
+          ) : null}
+
+          {!loadError && !loadingTest && view === "actions" && currentPayload ? (
+            <TestActions
+              test={currentPayload.test}
+              onBack={() => navigate({ view: "tests", testId: null, mockExamId: null })}
+              onPractice={handleStartPractice}
+              onMockExam={handleStartMock}
+            />
+          ) : null}
+
+          {!loadError && !loadingTest && view === "practice" && currentPayload ? (
             <>
+              <button
+                type="button"
+                onClick={() => navigate({ view: "actions", testId: currentPayload.test.study4_test_id, mockExamId: null })}
+                className="mb-3 text-sm font-bold text-teal-700 hover:underline"
+              >
+                ← Back to options
+              </button>
               <TestSummary test={currentPayload.test} questions={questions} modeLabel={modeLabel} />
               <PartTabs
                 payload={currentPayload}
@@ -432,6 +512,17 @@ window.TW.App = function App() {
                 <EmptyState>No questions found for this part.</EmptyState>
               )}
             </>
+          ) : null}
+
+          {!loadError && !loadingTest && view === "mock" && currentPayload ? (
+            <MockExamScreen
+              currentPayload={currentPayload}
+              initialMockExamId={mockExamId}
+              onStatus={setStatus}
+              onLeave={() => navigate({ view: "actions", testId: currentPayload.test.study4_test_id, mockExamId: null })}
+              onStartMockExam={(id) => navigate({ view: "mock", testId: currentPayload.test.study4_test_id, mockExamId: id })}
+              onNewMockExam={() => navigate({ view: "mock", testId: currentPayload.test.study4_test_id, mockExamId: null })}
+            />
           ) : null}
         </section>
       </main>
