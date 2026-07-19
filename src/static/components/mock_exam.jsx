@@ -5,6 +5,36 @@ function partLabel(sort_order) {
   return `Part ${sort_order}`;
 }
 
+function ExamTimer({ startedAt, endedAt }) {
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!startedAt || endedAt) return;
+    const interval = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(interval);
+  }, [startedAt, endedAt]);
+
+  if (!startedAt) return null;
+
+  const start = new Date(startedAt).getTime();
+  const end = endedAt ? new Date(endedAt).getTime() : Date.now();
+  const elapsed = Math.max(0, end - start);
+  const totalSeconds = Math.floor(elapsed / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (n) => String(n).padStart(2, "0");
+  const formatted =
+    hours > 0 ? `${pad(hours)}:${pad(minutes)}:${pad(seconds)}` : `${pad(minutes)}:${pad(seconds)}`;
+
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 font-mono text-sm font-semibold text-slate-700">
+      <span className="text-xs font-bold uppercase tracking-wide text-slate-400">Time</span>
+      {formatted}
+    </span>
+  );
+}
+
 function visibleQuestions(payload, selectedPart) {
   const questions = payload?.questions || [];
   if (selectedPart === "all") return questions;
@@ -399,6 +429,10 @@ window.TW.MockExamScreen = function MockExamScreen({
           <div className="mt-2 text-sm text-teal-800">
             Raw score: {result.raw_score ?? "-"} / {result.max_raw ?? "-"}
           </div>
+          <div className="mt-1 inline-flex items-center gap-1.5 text-sm text-teal-800">
+            Time taken:
+            <ExamTimer startedAt={activeExam.exam.created_at} endedAt={activeExam.exam.completed_at} />
+          </div>
         </section>
 
         <section className="rounded-lg border border-slate-200 bg-white p-4">
@@ -479,7 +513,8 @@ window.TW.MockExamScreen = function MockExamScreen({
           <div className="text-sm text-slate-500">
             <strong>{questions.length}</strong> question(s) · Drafts are saved automatically
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <ExamTimer startedAt={activeExam.exam.created_at} />
             <button
               type="button"
               disabled={submitting}
