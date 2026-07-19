@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import base64
 import json
+import mimetypes
 import os
 import sqlite3
 import urllib.error
@@ -30,6 +32,8 @@ SYSTEM_PROMPT_DIR = ROOT / "data" / "system_prompt"
 AI_BASE_URL = os.getenv("AI_BASE_URL", "http://localhost:20128/v1").rstrip("/")
 AI_MODEL = os.getenv("AI_MODEL", "cx/gpt-5.4")
 AI_API_KEY = os.getenv("AI_API_KEY", "")
+MAX_IMAGE_ATTACHMENTS = int(os.getenv("MAX_IMAGE_ATTACHMENTS", "3"))
+MAX_IMAGE_BYTES = int(os.getenv("MAX_IMAGE_BYTES", str(8 * 1024 * 1024)))
 
 app = FastAPI(title="TOEIC SW Writing Browser")
 app.mount("/static", StaticFiles(directory=STATIC_PATH), name="static")
@@ -84,7 +88,7 @@ def system_prompt_for_part(part_order: int) -> str:
     )
 
 
-def ai_chat(system_prompt: str, user_prompt: str) -> str:
+def ai_chat(system_prompt: str, user_content: Any) -> str:
     if not AI_API_KEY:
         raise HTTPException(
             status_code=500,
@@ -95,7 +99,7 @@ def ai_chat(system_prompt: str, user_prompt: str) -> str:
         "model": AI_MODEL,
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
+            {"role": "user", "content": user_content},
         ],
         "temperature": 0.2,
     }
@@ -128,12 +132,12 @@ def sse_event(event: str, data: Any) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-def ai_chat_stream(system_prompt: str, user_prompt: str):
+def ai_chat_stream(system_prompt: str, user_content: Any):
     payload = {
         "model": AI_MODEL,
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
+            {"role": "user", "content": user_content},
         ],
         "temperature": 0.2,
         "stream": True,
@@ -179,7 +183,80 @@ def ai_chat_stream(system_prompt: str, user_prompt: str):
         yield sse_event("error", {"detail": f"Could not reach AI server: {exc.reason}"})
 
 
-def score_context(request: ScoreRequest) -> tuple[int, int, str, str]:
+def guess_image_mime(url: str, content_type: str | None) -> str:
+    if content_type:
+        mime = content_type.split(";", 1)[0].strip().lower()
+        if mime.startswith("image/"):
+            return mime
+
+    mime, _encoding = mimetypes.guess_type(url)
+    return mime if mime and mime.startswith("image/") else "image/png"
+
+
+def fetch_image_as_data_url(url: str) -> tuple[str | None, str | None]:
+    request = urllib.request.Request(
+        url,
+        headers={
+            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+            "User-Agent": "Mozilla/5.0 TOEICWriting/1.0",
+        },
+        method="GET",
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            content_type = response.headers.get("Content-Type")
+            content_length = response.headers.get("Content-Length")
+            try:
+                if content_length and int(content_length) > MAX_IMAGE_BYTES:
+                    return None, f"{url} was larger than {MAX_IMAGE_BYTES} bytes"
+            except ValueError:
+                pass
+
+            image_bytes = response.read(MAX_IMAGE_BYTES + 1)
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as exc:
+        return None, f"{url} could not be fetched: {exc}"
+
+    if len(image_bytes) > MAX_IMAGE_BYTES:
+        return None, f"{url} was larger than {MAX_IMAGE_BYTES} bytes"
+    if not image_bytes:
+        return None, f"{url} returned an empty image"
+
+    mime = guess_image_mime(url, content_type)
+    encoded = base64.b64encode(image_bytes).decode("ascii")
+    return f"data:{mime};base64,{encoded}", None
+
+
+def build_user_content(prompt_text: str, asset_urls: list[str]) -> list[dict[str, Any]]:
+    content: list[dict[str, Any]] = [{"type": "text", "text": prompt_text}]
+    failures = []
+
+    for index, url in enumerate(asset_urls[:MAX_IMAGE_ATTACHMENTS], start=1):
+        data_url, error = fetch_image_as_data_url(url)
+        if error:
+            failures.append(error)
+            continue
+
+        content.append(
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": data_url,
+                    "detail": "high",
+                },
+            }
+        )
+        content.append({"type": "text", "text": f"Attached image {index}: {url}"})
+
+    if len(asset_urls) > MAX_IMAGE_ATTACHMENTS:
+        failures.append(f"{len(asset_urls) - MAX_IMAGE_ATTACHMENTS} image(s) were skipped by MAX_IMAGE_ATTACHMENTS")
+    if failures:
+        content.append({"type": "text", "text": "Image fetch notes:\n" + "\n".join(f"- {failure}" for failure in failures)})
+
+    return content
+
+
+def score_context(request: ScoreRequest) -> tuple[int, int, str, Any]:
     answer = request.answer.strip()
     if not answer:
         raise HTTPException(status_code=400, detail="Answer is empty")
@@ -219,10 +296,11 @@ def score_context(request: ScoreRequest) -> tuple[int, int, str, str]:
             f"Prompt text:\n{row['prompt_text'] or ''}",
             f"Prompt HTML:\n{row['prompt_html'] or ''}",
             "Image or asset URLs:\n" + ("\n".join(assets) if assets else "None"),
+            "If image attachments are present, use them as the primary visual evidence for evaluating the answer.",
             f"User answer:\n{answer}",
         ]
     )
-    return part_order, int(row["question_number"]), system_prompt_for_part(part_order), user_prompt
+    return part_order, int(row["question_number"]), system_prompt_for_part(part_order), build_user_content(user_prompt, assets)
 
 
 @app.get("/")

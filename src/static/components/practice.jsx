@@ -116,7 +116,7 @@ window.TW.AnswerBox = function AnswerBox({ question, part, draft, isScoring, onD
 function FeedbackPanel({ question, attempts }) {
   const { countWords, ScoreResult } = window.TW;
   const storageKey = `toeic-sw-writing-feedback-collapsed:${question.study4_test_id}:${question.question_number}`;
-  const [isCollapsed, setIsCollapsed] = React.useState(() => localStorage.getItem(storageKey) === "1");
+  const [isCollapsed, setIsCollapsed] = React.useState(() => localStorage.getItem(storageKey) !== "0");
   const isStreaming = attempts.some((attempt) => attempt.score?.state === "streaming");
 
   React.useEffect(() => {
