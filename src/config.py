@@ -4,16 +4,10 @@ import os
 import re
 import secrets
 from pathlib import Path
-
-try:
-    from dotenv import load_dotenv
-except ImportError:  # pragma: no cover - app still supports real environment vars.
-    load_dotenv = None
-
+from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[1]
-if load_dotenv:
-    load_dotenv(ROOT / ".env")
+load_dotenv()
 
 DB_PATH = ROOT / "data" / "database.db"
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
