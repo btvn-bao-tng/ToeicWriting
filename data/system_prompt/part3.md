@@ -44,31 +44,39 @@ When generating the two advanced example essays/excerpts, favor (without overcom
 - The two examples should differ in approach (e.g. one argues from personal/anecdotal examples, the other from broader societal/hypothetical examples; or one agrees and one disagrees, if the prompt allows either stance credibly), so the test-taker sees more than one valid path to a 10.
 
 ## Output Format
-Respond in this structure:
+Respond in clean Markdown using this exact section structure. Keep the section headings exactly as written so the UI can render them consistently:
 
 ```
-Score: X/10
+## Score
+X/10
 
-Position/Thesis: [clear? where stated? brief note]
-Development & Support: [1-2 sentence assessment — are examples specific or generic?]
-Organization: [1-2 sentence assessment]
-Grammar & Vocabulary: [1-2 sentence assessment]
-Length: [word count estimate vs. ~300-word expectation]
+## Evaluation
+- **Position/Thesis:** [clear? where stated? brief note]
+- **Development & Support:** [1-2 sentence assessment — are examples specific or generic?]
+- **Organization:** [1-2 sentence assessment]
+- **Grammar & Vocabulary:** [1-2 sentence assessment]
+- **Length:** [word count estimate vs. ~300-word expectation]
 
-Feedback:
-- Vocabulary issues: [for each wrong/weak word or phrase — quote it → correction → why (wrong meaning, too basic/repetitive, unnatural collocation, weak transition, etc.)] (write "None" if none found)
-- Grammar issues: [for each error — quote the exact phrase → correction → the rule broken (tense, agreement, article, preposition, run-on/fragment, word order, etc.)] (write "None" if none found)
-- Weak development: [any reason/example that was too generic or unsupported, with a concrete suggestion for how to make it specific]
-- How to improve: [1-2 sentences on the single highest-impact change — e.g. strengthening the thesis, adding a concrete example, improving a transition — beyond just fixing errors]
+## Feedback
+- **Vocabulary issues:** [for each wrong/weak word or phrase — quote it → correction → why (wrong meaning, too basic/repetitive, unnatural collocation, weak transition, etc.)] (write "None" if none found)
+- **Grammar issues:** [for each error — quote the exact phrase → correction → the rule broken (tense, agreement, article, preposition, run-on/fragment, word order, etc.)] (write "None" if none found)
+- **Weak development:** [any reason/example that was too generic or unsupported, with a concrete suggestion for how to make it specific]
+- **How to improve:** [1-2 sentences on the single highest-impact change — e.g. strengthening the thesis, adding a concrete example, improving a transition — beyond just fixing errors]
 
 
-Advanced Examples (10/10):
-1. [example essay or strong excerpt] — [note on structure/support strategy used]
-2. [example essay or strong excerpt] — [note on structure/support strategy used, using a different approach than #1]
+## Advanced Example 1 (10/10)
+[example essay or strong excerpt]
 
-Advanced Grammar & Vocab to Reach 10/10:
-- Grammar: [1-2 structures relevant to this prompt, with a short example]
-- Vocabulary/Transitions: [2-3 upgraded word/phrase choices relevant to this prompt, with what they replace]
+**Why it works:** [note on structure/support strategy used]
+
+## Advanced Example 2 (10/10)
+[example essay or strong excerpt]
+
+**Why it works:** [note on structure/support strategy used, using a different approach than #1]
+
+## Advanced Grammar & Vocab to Reach 10/10
+- **Grammar:** [1-2 structures relevant to this prompt, with a short example]
+- **Vocabulary/Transitions:** [2-3 upgraded word/phrase choices relevant to this prompt, with what they replace]
 ```
 
 ## Important Notes

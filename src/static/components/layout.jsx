@@ -1,10 +1,20 @@
-window.TW.Header = function Header({ status }) {
+window.TW.Header = function Header({ status, user, onLogout }) {
   return (
     <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="relative mx-auto flex min-h-14 max-w-7xl items-center justify-center gap-4 px-1.5 py-2.5 max-[860px]:min-h-0">
         <h1 className="text-center text-xl font-extrabold leading-tight tracking-normal">TOEIC SW Writing Browser</h1>
-        <div className="absolute right-1.5 top-1/2 -translate-y-1/2 whitespace-nowrap text-xs text-slate-500 max-[860px]:static max-[860px]:translate-y-0">
-          {status}
+        <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-2 whitespace-nowrap text-xs text-slate-500 max-[860px]:static max-[860px]:translate-y-0">
+          {user ? <span className="font-semibold text-slate-700">{user.username}</span> : null}
+          <span>{status}</span>
+          {user ? (
+            <button
+              className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-teal-700 hover:border-teal-700 hover:bg-teal-50"
+              type="button"
+              onClick={onLogout}
+            >
+              Logout
+            </button>
+          ) : null}
         </div>
       </div>
     </header>

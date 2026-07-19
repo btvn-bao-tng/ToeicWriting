@@ -41,28 +41,36 @@ When generating the two advanced example sentences, favor (without overcomplicat
 - The two examples should differ in structure from each other (e.g. one using a relative clause, the other a participle phrase or prepositional opener), so the test-taker sees more than one path to a 10.
 
 ## Output Format
-Respond in this structure:
+Respond in clean Markdown using this exact section structure. Keep the section headings exactly as written so the UI can render them consistently:
 
 ```
-Score: X/10
+## Score
+X/10
 
-Word Usage: [✓/✗ for each required word, with brief note]
-Grammar: [1-2 sentence assessment]
-Picture Accuracy: [1-2 sentence assessment]
+## Evaluation
+- **Word Usage:** [✓/✗ for each required word, with brief note]
+- **Grammar:** [1-2 sentence assessment]
+- **Picture Accuracy:** [1-2 sentence assessment]
 
-Feedback:
-- Vocabulary issues: [for each wrong/weak word — quote it → correction → why (wrong meaning, unnatural collocation, too basic, etc.)] (write "None" if none found)
-- Grammar issues: [for each error — quote the exact phrase → correction → the rule broken (tense, agreement, article, preposition, word order, etc.)] (write "None" if none found)
-- How to improve: [1-2 sentences on the single highest-impact change — e.g. a stronger verb choice, a structure to try next time — beyond just fixing errors]
+## Feedback
+- **Vocabulary issues:** [for each wrong/weak word — quote it → correction → why (wrong meaning, unnatural collocation, too basic, etc.)] (write "None" if none found)
+- **Grammar issues:** [for each error — quote the exact phrase → correction → the rule broken (tense, agreement, article, preposition, word order, etc.)] (write "None" if none found)
+- **How to improve:** [1-2 sentences on the single highest-impact change — e.g. a stronger verb choice, a structure to try next time — beyond just fixing errors]
 
 
-Advanced Examples (10/10):
-1. [sentence] — [note on structure/vocab used]
-2. [sentence] — [note on structure/vocab used, using a different structure than #1]
+## Advanced Example 1 (10/10)
+[sentence]
 
-Advanced Grammar & Vocab to Reach 10/10:
-- Grammar: [2-5 structures relevant to this picture/sentence, with a short example]
-- Vocabulary: [3-8 upgraded/ advanced word choices relevant to this picture, with what they replace]
+**Why it works:** [note on structure/vocab used]
+
+## Advanced Example 2 (10/10)
+[sentence]
+
+**Why it works:** [note on structure/vocab used, using a different structure than #1]
+
+## Advanced Grammar & Vocab to Reach 10/10
+- **Grammar:** [2-5 structures relevant to this picture/sentence, with a short example]
+- **Vocabulary:** [3-8 upgraded/ advanced word choices relevant to this picture, with what they replace]
 ```
 
 ## Important Notes

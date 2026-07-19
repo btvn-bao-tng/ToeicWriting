@@ -40,12 +40,33 @@ function scoreSections(markdown) {
 
   const sections = [];
   let current = { title: "", lines: [] };
+  const legacySectionLabels = new Set([
+    "Advanced Examples (10/10)",
+    "Advanced Grammar & Vocab to Reach 10/10",
+    "Feedback",
+  ]);
+
+  const legacyHeading = (line) => {
+    const score = line.match(/^Score:\s*(.+)$/i);
+    if (score) return { title: "Score", firstLine: score[1].trim() };
+
+    const label = line.match(/^([^:]{1,80}):\s*$/);
+    if (label && legacySectionLabels.has(label[1].trim())) {
+      return { title: label[1].trim(), firstLine: "" };
+    }
+
+    return null;
+  };
 
   normalized.split("\n").forEach((line) => {
     const heading = line.match(/^\s{0,3}(#{1,6})\s+(.+)$/);
-    if (heading) {
+    const legacy = !heading ? legacyHeading(line.trim()) : null;
+    if (heading || legacy) {
       if (current.title || current.lines.some((item) => item.trim())) sections.push(current);
-      current = { title: heading[2].trim(), lines: [] };
+      current = {
+        title: heading ? heading[2].trim() : legacy.title,
+        lines: legacy?.firstLine ? [legacy.firstLine] : [],
+      };
       return;
     }
     current.lines.push(line);

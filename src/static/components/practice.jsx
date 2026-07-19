@@ -93,7 +93,7 @@ window.TW.AnswerBox = function AnswerBox({ question, part, draft, isScoring, onD
         onChange={(event) => onDraftChange(question, event.target.value)}
       />
       <div className="mt-1.5 flex items-center justify-between gap-3 text-xs text-slate-500">
-        <span>Draft saved locally</span>
+        <span>Draft saved to your account</span>
         <span>
           <button
             className="bg-transparent p-0 text-xs font-bold text-teal-700 hover:underline disabled:cursor-wait disabled:opacity-70"
