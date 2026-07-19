@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-import sqlite3
 from typing import Any
 
-from ..database import row_to_dict
+from sqlalchemy import delete, select
+from sqlalchemy.orm import Session
+
+from ..database import Attempt
 from ..utils import now
 
 
 def insert_attempt(
-    conn: sqlite3.Connection,
+    conn: Session,
     user_id: int,
     study4_test_id: int,
     question_number: int,
@@ -18,95 +20,90 @@ def insert_attempt(
     model: str,
 ) -> int:
     timestamp = now()
-    cursor = conn.execute(
-        """
-        INSERT INTO attempts (
-            user_id, study4_test_id, question_number, answer,
-            score_text, score_state, model, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            user_id,
-            study4_test_id,
-            question_number,
-            answer,
-            score_text,
-            score_state,
-            model,
-            timestamp,
-            timestamp,
-        ),
+    attempt = Attempt(
+        user_id=user_id,
+        study4_test_id=study4_test_id,
+        question_number=question_number,
+        answer=answer,
+        score_text=score_text,
+        score_state=score_state,
+        model=model,
+        created_at=timestamp,
+        updated_at=timestamp,
     )
-    return cursor.lastrowid
+    conn.add(attempt)
+    conn.flush()
+    return attempt.id
 
 
 def mark_visible(
-    conn: sqlite3.Connection, attempt_id: int, score_text: str
+    conn: Session, attempt_id: int, score_text: str
 ) -> None:
-    conn.execute(
-        """
-        UPDATE attempts
-        SET score_text = ?, score_state = 'visible', updated_at = ?
-        WHERE id = ?
-        """,
-        (score_text, now(), attempt_id),
-    )
+    attempt = conn.get(Attempt, attempt_id)
+    if attempt is None:
+        return
+    attempt.score_text = score_text
+    attempt.score_state = "visible"
+    attempt.updated_at = now()
 
 
 def mark_error(
-    conn: sqlite3.Connection, attempt_id: int, detail: str
+    conn: Session, attempt_id: int, detail: str
 ) -> None:
-    conn.execute(
-        """
-        UPDATE attempts
-        SET score_state = 'error',
-            score_text = ?,
-            updated_at = ?
-        WHERE id = ?
-        """,
-        (detail, now(), attempt_id),
-    )
+    attempt = conn.get(Attempt, attempt_id)
+    if attempt is None:
+        return
+    attempt.score_state = "error"
+    attempt.score_text = detail
+    attempt.updated_at = now()
 
 
 def list_attempts(
-    conn: sqlite3.Connection, user_id: int, study4_test_id: int
+    conn: Session, user_id: int, study4_test_id: int
 ) -> list[dict[str, Any]]:
     rows = conn.execute(
-        """
-        SELECT id, question_number, answer, score_text, score_state, model, created_at
-        FROM attempts
-        WHERE user_id = ? AND study4_test_id = ?
-        ORDER BY question_number, id
-        """,
-        (user_id, study4_test_id),
-    ).fetchall()
-    return [row_to_dict(row) for row in rows]
+        select(
+            Attempt.id,
+            Attempt.question_number,
+            Attempt.answer,
+            Attempt.score_text,
+            Attempt.score_state,
+            Attempt.model,
+            Attempt.created_at,
+        )
+        .where(Attempt.user_id == user_id, Attempt.study4_test_id == study4_test_id)
+        .order_by(Attempt.question_number, Attempt.id)
+    ).all()
+    return [dict(row._mapping) for row in rows]
 
 
 def normalize_streaming(
-    conn: sqlite3.Connection, user_id: int
+    conn: Session, user_id: int
 ) -> None:
-    conn.execute(
-        """
-        UPDATE attempts
-        SET score_state = 'error',
-            score_text = COALESCE(NULLIF(score_text, ''), 'Scoring was interrupted.'),
-            updated_at = ?
-        WHERE user_id = ?
-            AND score_state = 'streaming'
-            AND score_text = ''
-        """,
-        (now(), user_id),
-    )
+    rows = conn.scalars(
+        select(Attempt).where(
+            Attempt.user_id == user_id,
+            Attempt.score_state == "streaming",
+            Attempt.score_text == "",
+        )
+    ).all()
+    timestamp = now()
+    for attempt in rows:
+        attempt.score_state = "error"
+        attempt.score_text = "Scoring was interrupted."
+        attempt.updated_at = timestamp
 
 
 def delete_attempts_for_question(
-    conn: sqlite3.Connection,
+    conn: Session,
     user_id: int,
     study4_test_id: int,
     question_number: int,
 ) -> None:
     conn.execute(
-        "DELETE FROM attempts WHERE user_id = ? AND study4_test_id = ? AND question_number = ?",
-        (user_id, study4_test_id, question_number),
+        delete(Attempt).where(
+            Attempt.user_id == user_id,
+            Attempt.study4_test_id == study4_test_id,
+            Attempt.question_number == question_number,
+        )
     )

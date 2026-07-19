@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import sqlite3
 from typing import Any
 
 import bcrypt
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 
 from ..config import ALLOW_SIGNUP, USERNAME_RE
 from ..database import db
@@ -25,7 +25,8 @@ def register_user(username: str, password: str) -> dict[str, Any]:
         try:
             uid = users_repo.insert_user(conn, username, password_hash)
             conn.commit()
-        except sqlite3.IntegrityError:
+        except IntegrityError:
+            conn.rollback()
             raise HTTPException(status_code=409, detail="That username is already taken.")
 
     return {"id": uid, "username": username}

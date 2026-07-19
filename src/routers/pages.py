@@ -3,7 +3,8 @@ from __future__ import annotations
 from fastapi import APIRouter
 from fastapi.responses import FileResponse
 
-from ..config import DB_PATH, INDEX_PATH
+from ..config import INDEX_PATH
+from ..database import engine
 
 router = APIRouter()
 
@@ -15,4 +16,4 @@ def index() -> FileResponse:
 
 @router.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "database": str(DB_PATH)}
+    return {"status": "ok", "database": engine.dialect.name}

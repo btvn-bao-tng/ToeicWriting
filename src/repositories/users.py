@@ -1,37 +1,41 @@
 from __future__ import annotations
 
-import sqlite3
 from typing import Any
 
-from ..database import row_to_dict
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from ..database import User
 from ..utils import now
 
 
 def insert_user(
-    conn: sqlite3.Connection, username: str, password_hash: str
+    conn: Session, username: str, password_hash: str
 ) -> int:
-    cursor = conn.execute(
-        "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
-        (username, password_hash, now()),
-    )
-    return cursor.lastrowid
+    user = User(username=username, password_hash=password_hash, created_at=now())
+    conn.add(user)
+    conn.flush()
+    return user.id
 
 
 def find_user_by_username(
-    conn: sqlite3.Connection, username: str
+    conn: Session, username: str
 ) -> dict[str, Any] | None:
-    row = conn.execute(
-        "SELECT id, username, password_hash, created_at FROM users WHERE username = ?",
-        (username,),
-    ).fetchone()
-    return row_to_dict(row) if row else None
+    user = conn.scalar(select(User).where(User.username == username))
+    if user is None:
+        return None
+    return {
+        "id": user.id,
+        "username": user.username,
+        "password_hash": user.password_hash,
+        "created_at": user.created_at,
+    }
 
 
 def find_user_by_id(
-    conn: sqlite3.Connection, user_id: int
+    conn: Session, user_id: int
 ) -> dict[str, Any] | None:
-    row = conn.execute(
-        "SELECT id, username, created_at FROM users WHERE id = ?",
-        (user_id,),
-    ).fetchone()
-    return row_to_dict(row) if row else None
+    user = conn.get(User, user_id)
+    if user is None:
+        return None
+    return {"id": user.id, "username": user.username, "created_at": user.created_at}

@@ -16,6 +16,7 @@ if load_dotenv:
     load_dotenv(ROOT / ".env")
 
 DB_PATH = ROOT / "data" / "database.db"
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
 INDEX_PATH = Path(__file__).resolve().parent / "index.html"
 STATIC_PATH = Path(__file__).resolve().parent / "static"
 SYSTEM_PROMPT_DIR = ROOT / "data" / "system_prompt"
