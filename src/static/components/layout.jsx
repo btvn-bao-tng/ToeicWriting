@@ -1,28 +1,21 @@
 window.TW.Header = function Header({ status, user, onLogout }) {
-  const [time, setTime] = React.useState(new Date());
-
-  React.useEffect(() => {
-    const interval = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const timeString = time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-
   return (
     <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="mx-auto flex min-h-12 max-w-5xl items-center justify-between gap-4 px-4 py-2 max-[860px]:min-h-0">
         <h1 className="text-lg font-extrabold leading-tight tracking-normal">TOEIC SW Writing</h1>
         <div className="flex items-center gap-3 text-xs text-slate-500">
           <span className="font-medium">{status}</span>
-          <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-slate-700">{timeString}</span>
           {user ? (
-            <button
-              className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-teal-700 hover:border-teal-700 hover:bg-teal-50"
-              type="button"
-              onClick={onLogout}
-            >
-              Logout
-            </button>
+            <>
+              <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-semibold text-slate-700">{user.username}</span>
+              <button
+                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-teal-700 hover:border-teal-700 hover:bg-teal-50"
+                type="button"
+                onClick={onLogout}
+              >
+                Logout
+              </button>
+            </>
           ) : null}
         </div>
       </div>

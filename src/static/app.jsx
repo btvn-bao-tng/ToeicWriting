@@ -448,7 +448,7 @@ window.TW.App = function App() {
   }
 
   if (!currentUser) {
-    return <AuthScreen onAuthenticated={handleAuthenticated} />;
+    return <AuthScreen />;
   }
 
   const { view, testId, mockExamId } = route;

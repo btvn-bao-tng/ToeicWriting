@@ -193,6 +193,8 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     username: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(String, nullable=False)
+    google_id: Mapped[str | None] = mapped_column(String, nullable=True, unique=True)
+    email: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[str] = mapped_column(String, nullable=False)
 
 
@@ -314,12 +316,39 @@ class MockExamAttempt(Base):
     updated_at: Mapped[str] = mapped_column(String, nullable=False)
 
 
+def _existing_columns(conn: Session, table_name: str) -> set[str]:
+    if IS_SQLITE:
+        rows = conn.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
+        return {row[1] for row in rows}
+    rows = conn.execute(
+        text("SELECT column_name FROM information_schema.columns WHERE table_name = :t"),
+        {"t": table_name},
+    ).fetchall()
+    return {row[0] for row in rows}
+
+
+def _migrate() -> None:
+    additions = {
+        "users": [
+            ("google_id", "VARCHAR UNIQUE"),
+            ("email", "VARCHAR"),
+        ],
+    }
+    for table_name, columns in additions.items():
+        with engine.begin() as conn:
+            existing = _existing_columns(conn, table_name)
+            for col_name, col_ddl in columns:
+                if col_name not in existing:
+                    conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_ddl}"))
+
+
 def init_db() -> None:
     if IS_SQLITE:
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         with engine.connect() as conn:
             conn.exec_driver_sql("PRAGMA journal_mode = WAL")
     Base.metadata.create_all(bind=engine)
+    _migrate()
 
 
 def get_db() -> Generator[Session, None, None]:
