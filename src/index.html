@@ -4,23 +4,52 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TOEIC SW Writing Browser</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="/static/config/tailwind.js?v=20260719-multiuser"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ["system-ui", "-apple-system", "BlinkMacSystemFont", "Inter", "Segoe UI", "sans-serif"],
+          },
+          colors: {
+            action: { DEFAULT: "#0066cc", focus: "#0071e3", dark: "#2997ff" },
+            ink: { DEFAULT: "#1d1d1f", 80: "#333333", 48: "#7a7a7a" },
+            parchment: "#f5f5f7",
+            pearl: "#fafafc",
+            hairline: "#e0e0e0",
+            divider: "#f0f0f0",
+            tile: { 1: "#272729", 2: "#2a2a2c", 3: "#252527" },
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    html { -webkit-text-size-adjust: 100%; }
+    body { font-size: 17px; line-height: 1.47; letter-spacing: -0.374px; }
+    ::selection { background: #0066cc; color: #fff; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: #d2d2d7; border-radius: 9999px; border: 2px solid #f5f5f7; }
+  </style>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
-<body class="bg-slate-50 font-sans text-slate-900">
+<body class="bg-parchment font-sans text-ink antialiased">
   <div id="root"></div>
 
-  <script type="text/babel" src="/static/lib/utils.jsx?v=20260719-multiuser"></script>
-  <script type="text/babel" src="/static/lib/markdown.jsx?v=20260719-multiuser"></script>
-  <script type="text/babel" src="/static/lib/api.jsx?v=20260719-multiuser"></script>
-  <script type="text/babel" src="/static/components/layout.jsx?v=20260719-multiuser"></script>
-  <script type="text/babel" src="/static/components/practice.jsx?v=20260719-multiuser"></script>
-  <script type="text/babel" src="/static/components/auth.jsx?v=20260719-multiuser"></script>
-  <script type="text/babel" src="/static/components/mock_exam.jsx?v=20260719-multiuser"></script>
-  <script type="text/babel" src="/static/app.jsx?v=20260719-multiuser"></script>
-  <script type="text/babel" src="/static/main.jsx?v=20260719-multiuser"></script>
+  <script type="text/babel" src="/static/lib/utils.jsx?v=20260720-apple-ui2"></script>
+  <script type="text/babel" src="/static/lib/markdown.jsx?v=20260720-apple-ui2"></script>
+  <script type="text/babel" src="/static/lib/api.jsx?v=20260720-apple-ui2"></script>
+  <script type="text/babel" src="/static/components/layout.jsx?v=20260720-apple-ui2"></script>
+  <script type="text/babel" src="/static/components/practice.jsx?v=20260720-apple-ui2"></script>
+  <script type="text/babel" src="/static/components/auth.jsx?v=20260720-apple-ui2"></script>
+  <script type="text/babel" src="/static/components/mock_exam.jsx?v=20260720-apple-ui2"></script>
+  <script type="text/babel" src="/static/app.jsx?v=20260720-apple-ui2"></script>
+  <script type="text/babel" src="/static/main.jsx?v=20260720-apple-ui2"></script>
 </body>
 </html>

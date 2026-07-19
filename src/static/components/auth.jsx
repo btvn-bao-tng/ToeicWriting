@@ -5,16 +5,16 @@ window.TW.AuthScreen = function AuthScreen() {
 
   return (
     <>
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex min-h-14 max-w-7xl items-center justify-center px-3 py-2.5">
-          <h1 className="text-center text-xl font-extrabold leading-tight tracking-normal">TOEIC SW Writing Browser</h1>
+      <header className="bg-black">
+        <div className="mx-auto flex min-h-[44px] max-w-7xl items-center justify-center px-3">
+          <h1 className="text-center text-[15px] font-semibold tracking-tight text-white">TOEIC SW Writing Browser</h1>
         </div>
       </header>
-      <main className="mx-auto flex min-h-[calc(100vh-57px)] max-w-md items-center px-4 py-8">
-        <section className="w-full rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="mb-4 text-center text-sm text-slate-500">Sign in to continue</p>
+      <main className="mx-auto flex min-h-[calc(100vh-44px)] max-w-md items-center px-4 py-10">
+        <section className="w-full rounded-[18px] border border-hairline bg-white p-8">
+          <p className="mb-5 text-center text-[17px] text-ink-48">Sign in to continue</p>
           <button
-            className="flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-hairline bg-white px-4 py-2.5 text-[17px] font-normal text-ink transition active:scale-95 hover:border-ink-48"
             type="button"
             onClick={handleGoogleLogin}
           >

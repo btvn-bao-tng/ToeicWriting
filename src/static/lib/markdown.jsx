@@ -10,13 +10,13 @@ window.TW.renderInlineMarkdown = function renderInlineMarkdown(value, keyPrefix)
     if (offset > lastIndex) nodes.push(String(value).slice(lastIndex, offset));
     if (match.startsWith("`")) {
       nodes.push(
-        <code key={`${keyPrefix}-code-${matchIndex}`} className="rounded bg-slate-100 px-1 py-0.5 text-[0.92em] text-slate-950">
+        <code key={`${keyPrefix}-code-${matchIndex}`} className="rounded bg-parchment px-1 py-0.5 text-[0.92em] text-ink">
           {match.slice(1, -1)}
         </code>
       );
     } else {
       nodes.push(
-        <strong key={`${keyPrefix}-strong-${matchIndex}`} className="font-semibold text-slate-950">
+        <strong key={`${keyPrefix}-strong-${matchIndex}`} className="font-semibold text-ink">
           {match.slice(2, -2)}
         </strong>
       );
@@ -127,7 +127,7 @@ function ScoreBlocks({ lines, sectionIndex }) {
     flushList();
     if (trimmed.startsWith(">")) {
       blocks.push(
-        <blockquote key={`quote-${sectionIndex}-${blocks.length}`} className="mb-2 border-l-4 border-teal-700 bg-teal-50/60 py-1.5 pl-3 text-slate-500 last:mb-0">
+        <blockquote key={`quote-${sectionIndex}-${blocks.length}`} className="mb-2 border-l-4 border-action bg-parchment py-1.5 pl-3 text-ink-48 last:mb-0">
           {renderInlineMarkdown(trimmed.replace(/^>\s*/, ""), `quote-${sectionIndex}-${blocks.length}`)}
         </blockquote>
       );
@@ -149,9 +149,9 @@ window.TW.ScoreMarkdown = function ScoreMarkdown({ markdown }) {
   return (
     <div className="grid overflow-hidden">
       {scoreSections(markdown).map((section, sectionIndex) => (
-        <section key={sectionIndex} className="border-t border-slate-200 px-2.5 py-2.5 first:border-t-0 first:bg-teal-50/60">
+        <section key={sectionIndex} className="border-t border-hairline px-3 py-3 first:border-t-0 first:bg-parchment">
           {section.title ? (
-            <h3 className="mb-2 text-[15px] font-extrabold leading-tight text-slate-900">
+            <h3 className="mb-2 text-[15px] font-semibold leading-tight text-ink">
               {renderInlineMarkdown(section.title, `h-${sectionIndex}`)}
             </h3>
           ) : null}
@@ -168,12 +168,12 @@ window.TW.ScoreResult = function ScoreResult({ score }) {
 
   const className = score.state === "error"
     ? `${SCORE_RESULT_BASE} block border-red-200 bg-red-50 p-3 text-red-800`
-    : `${SCORE_RESULT_BASE} block ${score.state === "streaming" ? "text-slate-900" : ""}`;
+    : `${SCORE_RESULT_BASE} block ${score.state === "streaming" ? "text-ink" : ""}`;
 
   return (
     <div className={className}>
       {score.state === "error" ? score.text : <ScoreMarkdown markdown={score.text || "### Scoring\n\nThinking..."} />}
-      {score.state === "streaming" ? <span className="ml-2 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-teal-700 align-[-2px]" /> : null}
+      {score.state === "streaming" ? <span className="ml-2 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-action align-[-2px]" /> : null}
     </div>
   );
 };

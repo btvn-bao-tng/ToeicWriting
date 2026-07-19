@@ -1,15 +1,15 @@
 window.TW.Header = function Header({ status, user, onLogout, onLogin }) {
   return (
-    <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex min-h-12 max-w-5xl items-center justify-between gap-4 px-4 py-2 max-[860px]:min-h-0">
-        <h1 className="text-lg font-extrabold leading-tight tracking-normal">TOEIC SW Writing</h1>
-        <div className="flex items-center gap-3 text-xs text-slate-500">
-          <span className="font-medium">{status}</span>
+    <header className="sticky top-0 z-20 bg-black text-white">
+      <div className="mx-auto flex min-h-[44px] max-w-5xl items-center justify-between gap-4 px-4">
+        <h1 className="text-[15px] font-semibold tracking-tight text-white">TOEIC SW Writing</h1>
+        <div className="flex items-center gap-3 text-[12px] text-white/60">
+          <span className="hidden font-medium text-white/50 sm:inline">{status}</span>
           {user ? (
             <>
-              <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-semibold text-slate-700">{user.username}</span>
+              <span className="rounded-full bg-white/10 px-2.5 py-1 text-[12px] font-medium text-white/80">{user.username}</span>
               <button
-                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-teal-700 hover:border-teal-700 hover:bg-teal-50"
+                className="rounded-full border border-white/20 px-3 py-1 text-[12px] text-white/80 active:scale-95 hover:text-white"
                 type="button"
                 onClick={onLogout}
               >
@@ -18,7 +18,7 @@ window.TW.Header = function Header({ status, user, onLogout, onLogin }) {
             </>
           ) : (
             <button
-              className="rounded-md border border-teal-700 bg-teal-700 px-2 py-1 text-xs font-bold text-white hover:bg-teal-800"
+              className="rounded-full bg-action px-3 py-1 text-[12px] font-medium text-white active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-focus"
               type="button"
               onClick={onLogin}
             >
@@ -33,7 +33,7 @@ window.TW.Header = function Header({ status, user, onLogout, onLogin }) {
 
 window.TW.EmptyState = function EmptyState({ children, error = false }) {
   return (
-    <div className={`rounded-lg border border-dashed p-6 ${error ? "border-red-200 bg-red-50 text-red-800" : "border-slate-200 bg-white text-slate-500"}`}>
+    <div className={`rounded-[18px] border p-6 text-[15px] ${error ? "border-red-200 bg-red-50 text-red-800" : "border-hairline bg-white text-ink-48"}`}>
       {children}
     </div>
   );
@@ -42,69 +42,66 @@ window.TW.EmptyState = function EmptyState({ children, error = false }) {
 window.TW.TestList = function TestList({ tests, selectedId, onSelect }) {
   const { PILL_CLASS } = window.TW.classes;
   return (
-    <section className="space-y-4">
-      <h2 className="text-2xl font-extrabold text-slate-900">Choose a test</h2>
-      <p className="text-sm text-slate-500">Select a TOEIC SW Writing test to start practicing or take a mock exam.</p>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {tests.map((test) => (
-          <button
-            key={test.study4_test_id}
-            type="button"
-            onClick={() => onSelect(test.study4_test_id)}
-            className={`rounded-lg border bg-white p-4 text-left shadow-sm transition hover:border-teal-700 hover:bg-teal-50 ${
-              test.study4_test_id === selectedId ? "border-teal-700 bg-teal-50" : "border-slate-200"
-            }`}
-          >
-            <strong className="block text-base font-extrabold text-slate-900">{test.title}</strong>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <span className={PILL_CLASS}>{test.duration_minutes ?? "-"} min</span>
-              <span className={PILL_CLASS}>{test.question_count} questions</span>
-              <span className={PILL_CLASS}>{test.access_status}</span>
-            </div>
-          </button>
-        ))}
+    <section className="space-y-6">
+      <div className="space-y-2">
+        <h2 className="text-[40px] font-semibold leading-[1.1] tracking-normal text-ink">Choose a test</h2>
+        <p className="text-[17px] text-ink-48">Select a TOEIC SW Writing test to start practicing or take a mock exam.</p>
+      </div>
+      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        {tests.map((test) => {
+          const selected = test.study4_test_id === selectedId;
+          return (
+            <button
+              key={test.study4_test_id}
+              type="button"
+              onClick={() => onSelect(test.study4_test_id)}
+              className={`rounded-[18px] border bg-white p-6 text-left transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-focus focus-visible:ring-offset-2 ${selected ? "border-action" : "border-hairline hover:border-ink-48"}`}
+            >
+              <strong className="block text-[17px] font-semibold text-ink">{test.title}</strong>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span className={PILL_CLASS}>{test.duration_minutes ?? "-"} min</span>
+                <span className={PILL_CLASS}>{test.question_count} questions</span>
+                <span className={PILL_CLASS}>{test.access_status}</span>
+              </div>
+            </button>
+          );
+        })}
       </div>
     </section>
   );
 };
 
 window.TW.TestActions = function TestActions({ test, onBack, onPractice, onMockExam }) {
-  const { PILL_CLASS } = window.TW.classes;
+  const { PILL_CLASS, LINK, CARD } = window.TW.classes;
   return (
-    <section className="space-y-4">
-      <button
-        type="button"
-        onClick={onBack}
-        className="text-sm font-bold text-teal-700 hover:underline"
-      >
+    <section className="space-y-6">
+      <button type="button" onClick={onBack} className={`text-[14px] ${LINK}`}>
         ← Back to tests
       </button>
-      <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-2xl font-extrabold text-slate-900">{test.title}</h2>
-        <div className="mt-3 flex flex-wrap gap-2">
+      <section className={`${CARD} p-6 sm:p-8`}>
+        <h2 className="text-[40px] font-semibold leading-[1.1] tracking-normal text-ink">{test.title}</h2>
+        <div className="mt-4 flex flex-wrap gap-2">
           <span className={PILL_CLASS}>{test.duration_minutes ?? "-"} minutes</span>
           <span className={PILL_CLASS}>{test.question_count} questions</span>
           <span className={PILL_CLASS}>{test.access_status}</span>
         </div>
-        <p className="mt-4 text-sm text-slate-500">
-          Choose how you want to work with this test.
-        </p>
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        <p className="mt-5 text-[17px] text-ink-48">Choose how you want to work with this test.</p>
+        <div className="mt-7 grid gap-3 sm:grid-cols-2">
           <button
             type="button"
             onClick={onPractice}
-            className="min-h-14 rounded-lg border border-teal-700 bg-teal-700 px-4 py-3 text-left text-white shadow-sm hover:bg-teal-800"
+            className="min-h-[68px] rounded-[18px] bg-action px-5 py-4 text-left text-white transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-focus focus-visible:ring-offset-2"
           >
-            <strong className="block text-base">Practice</strong>
-            <span className="mt-0.5 block text-xs opacity-90">Score each question as you go</span>
+            <span className="block text-[18px] font-light">Practice</span>
+            <span className="mt-1 block text-[14px] font-normal text-white/80">Score each question as you go</span>
           </button>
           <button
             type="button"
             onClick={onMockExam}
-            className="min-h-14 rounded-lg border border-slate-200 bg-white px-4 py-3 text-left text-slate-900 shadow-sm hover:border-teal-700 hover:bg-teal-50"
+            className="min-h-[68px] rounded-[18px] border border-hairline bg-white px-5 py-4 text-left text-ink transition active:scale-95 hover:border-action focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-focus focus-visible:ring-offset-2"
           >
-            <strong className="block text-base">Mock Exam</strong>
-            <span className="mt-0.5 block text-xs text-slate-500">Answer all, then score to 0–200</span>
+            <span className="block text-[18px] font-light">Mock Exam</span>
+            <span className="mt-1 block text-[14px] font-normal text-ink-48">Answer all, then score to 0–200</span>
           </button>
         </div>
       </section>

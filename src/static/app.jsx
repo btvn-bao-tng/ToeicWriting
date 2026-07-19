@@ -472,8 +472,8 @@ window.TW.App = function App() {
     return (
       <>
         <Header status={status} />
-        <main className="p-6">
-          <EmptyState>Checking session...</EmptyState>
+      <main className="px-4 py-8 sm:px-6 sm:py-12">
+        <EmptyState>Checking session...</EmptyState>
         </main>
       </>
     );
@@ -485,15 +485,15 @@ window.TW.App = function App() {
   return (
     <>
       <Header status={status} user={currentUser} onLogout={handleLogout} onLogin={handleLogin} />
-      <main className="p-6">
+      <main className="px-4 py-8 sm:px-6 sm:py-12">
         <section className="mx-auto min-w-0 max-w-5xl">
           {isGuest ? (
-            <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-[18px] border border-hairline bg-parchment px-4 py-2.5 text-[15px] text-ink-80">
               <span>Browsing as a guest. Log in to score answers and save your progress.</span>
               <button
                 type="button"
                 onClick={handleLogin}
-                className="min-h-8 rounded-md border border-amber-300 bg-white px-3 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100"
+                className="rounded-full bg-action px-4 py-1.5 text-[14px] font-normal text-white active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-focus"
               >
                 Login with Gmail
               </button>
@@ -520,7 +520,7 @@ window.TW.App = function App() {
               <button
                 type="button"
                 onClick={() => navigate({ view: "actions", testId: currentPayload.test.study4_test_id, mockExamId: null })}
-                className="mb-3 text-sm font-bold text-teal-700 hover:underline"
+                className="mb-3 text-[14px] font-normal text-action hover:underline"
               >
                 ← Back to options
               </button>
@@ -561,12 +561,12 @@ window.TW.App = function App() {
 
           {!loadError && !loadingTest && view === "mock" && currentPayload ? (
             isGuest ? (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-center">
-                <p className="mb-3 text-sm text-amber-800">Mock exams require login. Log in to start a timed mock exam.</p>
+              <div className="rounded-[18px] border border-hairline bg-parchment p-10 text-center">
+                <p className="mb-4 text-[17px] text-ink-80">Mock exams require login. Log in to start a timed mock exam.</p>
                 <button
                   type="button"
                   onClick={handleLogin}
-                  className="min-h-10 rounded-md border border-teal-700 bg-teal-700 px-4 py-2 text-sm font-bold text-white hover:bg-teal-800"
+                  className="rounded-full bg-action px-6 py-2.5 text-[17px] font-normal text-white active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-focus"
                 >
                   Login with Gmail
                 </button>

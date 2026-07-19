@@ -1,10 +1,18 @@
 window.TW = window.TW || {};
 
+const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-focus focus-visible:ring-offset-2";
+
 window.TW.classes = {
-  PILL_CLASS: "rounded-full border border-slate-200 bg-white px-2.5 py-1 text-sm text-slate-500",
-  PART_BUTTON_BASE: "min-h-9 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 hover:border-teal-700 hover:bg-teal-50 hover:text-teal-950",
-  PART_BUTTON_ACTIVE: "border-teal-700 bg-teal-50 text-teal-950",
-  SCORE_RESULT_BASE: "mt-2.5 overflow-hidden rounded-lg border border-slate-200 bg-white text-sm leading-relaxed",
+  PILL_CLASS: "inline-flex items-center rounded-full border border-hairline bg-pearl px-3 py-1 text-[14px] text-ink-80",
+  PART_BUTTON_BASE: "min-h-9 rounded-full border border-hairline bg-white px-3 py-1.5 text-[14px] text-ink active:scale-95",
+  PART_BUTTON_ACTIVE: "border-action bg-parchment text-ink",
+  SCORE_RESULT_BASE: "mt-2.5 overflow-hidden rounded-[18px] border border-hairline bg-white text-[15px] leading-relaxed",
+  BTN_PRIMARY: `inline-flex items-center justify-center rounded-full bg-action px-[22px] py-[11px] text-[17px] font-normal text-white active:scale-95 ${FOCUS} disabled:opacity-60`,
+  BTN_GHOST: `inline-flex items-center justify-center rounded-full border border-action bg-transparent px-[22px] py-[11px] text-[17px] font-normal text-action active:scale-95 ${FOCUS}`,
+  BTN_UTILITY: `inline-flex items-center justify-center rounded-[8px] border border-hairline bg-white px-3.5 py-1.5 text-[14px] text-ink active:scale-95 ${FOCUS}`,
+  BTN_PEARL: `inline-flex items-center justify-center rounded-[11px] bg-pearl px-3.5 py-2 text-[14px] text-ink-80 active:scale-95 ${FOCUS}`,
+  LINK: "text-action hover:underline",
+  CARD: "rounded-[18px] border border-hairline bg-white",
 };
 
 window.TW.fetchJson = async function fetchJson(url) {

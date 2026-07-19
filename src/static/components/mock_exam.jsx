@@ -28,8 +28,8 @@ function ExamTimer({ startedAt, endedAt }) {
     hours > 0 ? `${pad(hours)}:${pad(minutes)}:${pad(seconds)}` : `${pad(minutes)}:${pad(seconds)}`;
 
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 font-mono text-sm font-semibold text-slate-700">
-      <span className="text-xs font-bold uppercase tracking-wide text-slate-400">Time</span>
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-white px-3 py-1.5 font-mono text-[14px] font-semibold text-ink">
+      <span className="text-[10px] font-semibold uppercase tracking-tight text-ink-48">Time</span>
       {formatted}
     </span>
   );
@@ -79,6 +79,7 @@ window.TW.MockExamScreen = function MockExamScreen({
     listMockExams,
     partName,
   } = window.TW;
+  const { PILL_CLASS, CARD, BTN_PRIMARY, BTN_UTILITY, LINK } = window.TW.classes;
 
   const [selectedPart, setSelectedPart] = useState("all");
   const [activeExam, setActiveExam] = useState(null);
@@ -273,7 +274,7 @@ window.TW.MockExamScreen = function MockExamScreen({
             status: { ...previous.status, [number]: "done" },
             messages: {
               ...previous.messages,
-              [number]: `Score: ${data.score_10 ?? "-"}/10 → ${data.converted_score ?? "-"}/${data.max_score}`,
+              [number]: `Score: ${data.score_10 ?? "-"} → ${data.converted_score ?? "-"}/${data.max_score}`,
             },
           }));
           setStreamingAttempts((previous) => {
@@ -340,17 +341,13 @@ window.TW.MockExamScreen = function MockExamScreen({
 
   if (!activeExam) {
     return (
-      <section className="space-y-4">
-        <button
-          type="button"
-          onClick={onLeave}
-          className="text-sm font-bold text-teal-700 hover:underline"
-        >
+      <section className="space-y-6">
+        <button type="button" onClick={onLeave} className={`text-[14px] ${LINK}`}>
           ← Back to options
         </button>
         <TestSummary test={test} questions={visibleQuestions(currentPayload, selectedPart)} modeLabel="Mock exam" />
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h3 className="mb-3 text-lg font-extrabold">Select scope</h3>
+        <section className={`${CARD} p-5 sm:p-6`}>
+          <h3 className="mb-3 text-[21px] font-semibold tracking-tight text-ink">Select scope</h3>
           <div className="flex flex-wrap gap-2">
             {[
               { key: "1", label: "Part 1" },
@@ -362,47 +359,47 @@ window.TW.MockExamScreen = function MockExamScreen({
                 key={key}
                 type="button"
                 onClick={() => setSelectedPart(key)}
-                className={`min-h-9 rounded-md border px-3 py-1.5 text-sm font-bold ${
+                className={`min-h-9 rounded-full border px-4 py-1.5 text-[14px] active:scale-95 ${
                   selectedPart === key
-                    ? "border-teal-700 bg-teal-50 text-teal-950"
-                    : "border-slate-200 bg-white text-slate-900 hover:border-teal-700 hover:bg-teal-50"
+                    ? "border-action bg-parchment text-ink"
+                    : "border-hairline bg-white text-ink hover:border-ink-48"
                 }`}
               >
                 {label}
               </button>
             ))}
           </div>
-          <div className="mt-4 flex items-center gap-3">
+          <div className="mt-5 flex items-center gap-3">
             <button
               type="button"
               disabled={loading}
               onClick={startExam}
-              className="min-h-10 rounded-md border border-teal-700 bg-teal-700 px-4 py-2 text-sm font-bold text-white hover:bg-teal-800 disabled:cursor-wait disabled:opacity-70"
+              className={BTN_PRIMARY}
             >
               {loading ? "Starting..." : "Start Mock Exam"}
             </button>
-            <span className="text-sm text-slate-500">
+            <span className="text-[15px] text-ink-48">
               {visibleQuestions(currentPayload, selectedPart).length} question(s)
             </span>
           </div>
         </section>
 
         {history.length > 0 ? (
-          <section className="rounded-lg border border-slate-200 bg-white p-4">
-            <h3 className="mb-3 text-lg font-extrabold">Past mock exams for this test</h3>
+          <section className={`${CARD} p-5 sm:p-6`}>
+            <h3 className="mb-3 text-[21px] font-semibold tracking-tight text-ink">Past mock exams for this test</h3>
             <div className="space-y-2">
               {history.map((exam) => (
                 <button
                   key={exam.id}
                   type="button"
                   onClick={() => loadExam(exam.id)}
-                  className="grid w-full grid-cols-[1fr_auto_auto] items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left hover:bg-teal-50"
+                  className="grid w-full grid-cols-[1fr_auto_auto] items-center gap-3 rounded-[11px] border border-hairline bg-parchment px-4 py-3 text-left active:scale-95 hover:bg-pearl"
                 >
-                  <span className="text-sm font-semibold text-slate-900">
+                  <span className="text-[15px] font-semibold text-ink">
                     {partLabel(exam.selected_part)}
                   </span>
-                  <span className="text-sm text-slate-500">{formatDate(exam.created_at)}</span>
-                  <span className="rounded-full bg-white px-2 py-1 text-xs font-bold text-slate-500">
+                  <span className="text-[14px] text-ink-48">{formatDate(exam.created_at)}</span>
+                  <span className="rounded-full border border-hairline bg-white px-3 py-1 text-[12px] font-medium text-ink-48">
                     {exam.status === "completed" ? `${exam.scaled_score ?? "-"} / 200` : "In progress"}
                   </span>
                 </button>
@@ -418,33 +415,33 @@ window.TW.MockExamScreen = function MockExamScreen({
     const result = activeExam.result || {};
     const breakdown = result.breakdown || [];
     return (
-      <section className="space-y-4">
+      <section className="space-y-6">
         <TestSummary test={test} questions={questions} modeLabel={`Mock exam · ${partLabel(activeExam.exam.selected_part)}`} />
-        <section className="rounded-lg border border-teal-200 bg-teal-50 p-6 text-center">
-          <div className="text-sm font-bold uppercase tracking-wide text-teal-800">Scaled Score</div>
-          <div className="mt-1 text-5xl font-extrabold text-teal-900">
+        <section className="rounded-[18px] bg-tile-1 p-10 text-center text-white">
+          <div className="text-[14px] font-semibold uppercase tracking-tight text-white/60">Scaled Score</div>
+          <div className="mt-1 text-[56px] font-semibold leading-[1.07] tracking-tight">
             {result.scaled_score ?? "-"}
-            <span className="text-2xl font-semibold text-teal-700"> / 200</span>
+            <span className="text-[28px] font-normal text-action-dark"> / 200</span>
           </div>
-          <div className="mt-2 text-sm text-teal-800">
+          <div className="mt-2 text-[17px] text-white/80">
             Raw score: {result.raw_score ?? "-"} / {result.max_raw ?? "-"}
           </div>
-          <div className="mt-1 inline-flex items-center gap-1.5 text-sm text-teal-800">
+          <div className="mt-1 inline-flex items-center gap-1.5 text-[15px] text-white/80">
             Time taken:
             <ExamTimer startedAt={activeExam.exam.created_at} endedAt={activeExam.exam.completed_at} />
           </div>
         </section>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h3 className="mb-3 text-lg font-extrabold">Score breakdown</h3>
+        <section className={`${CARD} p-5 sm:p-6`}>
+          <h3 className="mb-3 text-[21px] font-semibold tracking-tight text-ink">Score breakdown</h3>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-[15px]">
               <thead>
-                <tr className="border-b border-slate-200 text-left text-slate-500">
-                  <th className="pb-2 pr-3">Question</th>
-                  <th className="pb-2 pr-3">Part</th>
-                  <th className="pb-2 pr-3">Practice score</th>
-                  <th className="pb-2 pr-3">Converted</th>
+                <tr className="border-b border-hairline text-left text-ink-48">
+                  <th className="pb-2 pr-3 font-semibold">Question</th>
+                  <th className="pb-2 pr-3 font-semibold">Part</th>
+                  <th className="pb-2 pr-3 font-semibold">Practice score</th>
+                  <th className="pb-2 pr-3 font-semibold">Converted</th>
                 </tr>
               </thead>
               <tbody>
@@ -452,11 +449,11 @@ window.TW.MockExamScreen = function MockExamScreen({
                   const question = questions.find((q) => q.question_number === item.question_number);
                   const part = question ? partForQuestion(question, parts) : null;
                   return (
-                    <tr key={item.question_number} className="border-b border-slate-100 last:border-0">
-                      <td className="py-2 pr-3 font-semibold">Question {item.question_number}</td>
-                      <td className="py-2 pr-3 text-slate-500">{part ? partName(part) : "-"}</td>
-                      <td className="py-2 pr-3 text-slate-500">{item.score_10 ?? "-"} / 10</td>
-                      <td className="py-2 pr-3 font-bold text-teal-700">
+                    <tr key={item.question_number} className="border-b border-divider last:border-0">
+                      <td className="py-2.5 pr-3 font-semibold text-ink">Question {item.question_number}</td>
+                      <td className="py-2.5 pr-3 text-ink-48">{part ? partName(part) : "-"}</td>
+                      <td className="py-2.5 pr-3 text-ink-48">{item.score_10 ?? "-"} / 10</td>
+                      <td className="py-2.5 pr-3 font-semibold text-action">
                         {item.converted_score} / {item.max_score}
                       </td>
                     </tr>
@@ -468,19 +465,19 @@ window.TW.MockExamScreen = function MockExamScreen({
         </section>
 
         <section className="space-y-3">
-          <h3 className="text-lg font-extrabold">Feedback</h3>
+          <h3 className="text-[21px] font-semibold tracking-tight text-ink">Feedback</h3>
           {(activeExam.attempts || []).map((attempt) => {
             const question = questions.find((q) => q.question_number === attempt.question_number);
             if (!question) return null;
             return (
-              <article key={attempt.id} className="rounded-lg border border-slate-200 bg-white p-3">
+              <article key={attempt.id} className={`${CARD} p-4`}>
                 <div className="mb-2 flex items-center justify-between gap-3">
-                  <strong className="text-[15px] font-extrabold">Question {attempt.question_number}</strong>
-                  <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-500">
+                  <strong className="text-[15px] font-semibold text-ink">Question {attempt.question_number}</strong>
+                  <span className="rounded-full border border-hairline bg-white px-3 py-1 text-[12px] text-ink-48">
                     {attempt.converted_score} / {attempt.max_score}
                   </span>
                 </div>
-                <div className="mb-2 text-xs text-slate-500">Practice score: {attempt.score_10 ?? "-"} / 10</div>
+                <div className="mb-2 text-[12px] text-ink-48">Practice score: {attempt.score_10 ?? "-"} / 10</div>
                 <ScoreResult
                   score={{
                     state: attempt.score_state,
@@ -496,7 +493,7 @@ window.TW.MockExamScreen = function MockExamScreen({
           <button
             type="button"
             onClick={resetToSetup}
-            className="min-h-10 rounded-md border border-teal-700 bg-teal-700 px-4 py-2 text-sm font-bold text-white hover:bg-teal-800"
+            className={BTN_PRIMARY}
           >
             Start New Mock Exam
           </button>
@@ -508,10 +505,10 @@ window.TW.MockExamScreen = function MockExamScreen({
   return (
     <section className="space-y-4">
       <TestSummary test={test} questions={questions} modeLabel={`Mock exam · ${partLabel(activeExam.exam.selected_part)}`} />
-      <div className="sticky top-[72px] z-10 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="sticky top-[52px] z-10 rounded-[18px] border border-hairline bg-parchment/80 p-3 backdrop-blur-md">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="text-sm text-slate-500">
-            <strong>{questions.length}</strong> question(s) · Drafts are saved automatically
+          <div className="text-[15px] text-ink-48">
+            <strong className="text-ink">{questions.length}</strong> question(s) · Drafts are saved automatically
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <ExamTimer startedAt={activeExam.exam.created_at} />
@@ -519,7 +516,7 @@ window.TW.MockExamScreen = function MockExamScreen({
               type="button"
               disabled={submitting}
               onClick={handleSubmit}
-              className="min-h-10 rounded-md border border-teal-700 bg-teal-700 px-4 py-2 text-sm font-bold text-white hover:bg-teal-800 disabled:cursor-wait disabled:opacity-70"
+              className={`${BTN_PRIMARY} !text-[14px] disabled:opacity-70`}
             >
               {submitting ? "Scoring..." : "Complete & Score"}
             </button>
@@ -527,7 +524,7 @@ window.TW.MockExamScreen = function MockExamScreen({
               type="button"
               disabled={submitting}
               onClick={onLeave}
-              className="min-h-10 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-900 hover:border-teal-700 hover:bg-teal-50 disabled:opacity-70"
+              className={`${BTN_UTILITY} disabled:opacity-70`}
             >
               Leave exam
             </button>
@@ -536,9 +533,9 @@ window.TW.MockExamScreen = function MockExamScreen({
       </div>
 
       {submitting ? (
-        <section className="rounded-lg border border-teal-200 bg-teal-50 p-4">
-          <h3 className="mb-2 text-sm font-extrabold text-teal-900">Scoring progress</h3>
-          <div className="mb-3 text-sm text-teal-800">
+        <section className="rounded-[18px] border border-action/30 bg-parchment p-5">
+          <h3 className="mb-2 text-[14px] font-semibold uppercase tracking-tight text-ink">Scoring progress</h3>
+          <div className="mb-3 text-[15px] text-ink-80">
             {scoringProgress.current
               ? `Scoring Question ${scoringProgress.current} of ${scoringProgress.total}`
               : `Preparing to score ${scoringProgress.total} question(s)...`}
@@ -549,14 +546,14 @@ window.TW.MockExamScreen = function MockExamScreen({
               const message = scoringProgress.messages[question.question_number] || "";
               const stateClass =
                 state === "done"
-                  ? "text-teal-700"
+                  ? "text-action"
                   : state === "error"
                   ? "text-red-700"
                   : state === "scoring"
-                  ? "text-slate-700"
-                  : "text-slate-400";
+                  ? "text-ink-80"
+                  : "text-ink-48";
               return (
-                <div key={question.question_number} className="flex items-center gap-2 text-sm">
+                <div key={question.question_number} className="flex items-center gap-2 text-[14px]">
                   <span className={`min-w-[110px] font-semibold ${stateClass}`}>
                     Question {question.question_number}
                   </span>
@@ -590,12 +587,12 @@ window.TW.MockExamScreen = function MockExamScreen({
         <EmptyState>No questions found for this part.</EmptyState>
       )}
 
-      <div className="rounded-lg border border-slate-200 bg-white p-3">
+      <div className="rounded-[18px] border border-hairline bg-white p-3">
         <button
           type="button"
           disabled={submitting}
           onClick={handleSubmit}
-          className="min-h-10 w-full rounded-md border border-teal-700 bg-teal-700 px-4 py-2 text-sm font-bold text-white hover:bg-teal-800 disabled:cursor-wait disabled:opacity-70"
+          className={`${BTN_PRIMARY} w-full disabled:opacity-70`}
         >
           {submitting ? "Scoring..." : "Complete & Score"}
         </button>
