@@ -35,3 +35,5 @@ dist/
 *.db-shm
 *.db-wal
 data/database.backup-*.db
+
+zdraft/*

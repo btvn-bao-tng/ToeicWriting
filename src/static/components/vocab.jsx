@@ -66,7 +66,7 @@ function DetailImage({ image, term }) {
   );
 }
 
-window.TW.VocabTermDetail = function VocabTermDetail({ item, topic, onBack }) {
+window.TW.VocabTermDetail = function VocabTermDetail({ item, topic, questionPrompt, onBack }) {
   const { getVocabDetail, speak } = window.TW;
   const { BTN_UTILITY, LINK } = window.TW.classes;
   const [detail, setDetail] = React.useState(null);
@@ -78,12 +78,12 @@ window.TW.VocabTermDetail = function VocabTermDetail({ item, topic, onBack }) {
     setLoading(true);
     setError("");
     setDetail(null);
-    getVocabDetail(item.term, topic, item.image?.url)
+    getVocabDetail(item.term, topic, item.image?.url, questionPrompt)
       .then((d) => { if (!cancelled) setDetail(d); })
       .catch((err) => { if (!cancelled) setError(err.message || "Could not load details"); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [item.term, topic, item.image?.url]);
+  }, [item.term, topic, item.image?.url, questionPrompt]);
 
   const extraImages = detail?.images || [];
 
@@ -251,7 +251,7 @@ window.TW.QuestionPicture = function QuestionPicture({ question }) {
 
 window.TW.VocabModal = function VocabModal({ open, vocab, loading, error, onClose, onRegenerate, regenerating, question }) {
   const { BTN_UTILITY: Btn } = window.TW.classes;
-  const { VocabTermCell: TermCell, VocabTermDetail: TermDetail } = window.TW;
+  const { VocabTermCell: TermCell, VocabTermDetail: TermDetail, QuestionPicture } = window.TW;
   const categories = vocab?.categories || [];
 
   const [catIndex, setCatIndex] = React.useState(0);
@@ -287,6 +287,9 @@ window.TW.VocabModal = function VocabModal({ open, vocab, loading, error, onClos
   if (!open) return null;
 
   const current = categories[catIndex];
+  const questionPromptText = question
+    ? [question.prompt_text || "", window.TW.vocabStripHtml(question.prompt_html)].filter(Boolean).join(" ")
+    : "";
 
   return (
     <div
@@ -328,9 +331,16 @@ window.TW.VocabModal = function VocabModal({ open, vocab, loading, error, onClos
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-hidden">
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          {question ? (
+            <aside className="hidden w-[300px] shrink-0 overflow-auto border-r border-hairline bg-parchment p-3 md:block lg:w-[340px]">
+              <QuestionPicture question={question} />
+            </aside>
+          ) : null}
+
+          <div className="min-w-0 flex-1 overflow-hidden">
           {detailItem ? (
-            <TermDetail item={detailItem} topic={vocab?.topic || ""} onBack={() => setDetailItem(null)} />
+            <TermDetail item={detailItem} topic={vocab?.topic || ""} questionPrompt={question ? questionPromptText : ""} onBack={() => setDetailItem(null)} />
           ) : error ? (
             <div className="flex h-full items-center justify-center p-4">
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-[11px] border border-red-200 bg-red-50 p-3 text-[14px] text-red-800">
@@ -409,6 +419,7 @@ window.TW.VocabModal = function VocabModal({ open, vocab, loading, error, onClos
               </div>
             </div>
           )}
+          </div>
         </div>
 
         <div className="border-t border-hairline bg-parchment px-4 py-2 text-[12px] text-ink-48">
@@ -423,7 +434,6 @@ window.TW.VocabSection = function VocabSection({ question, allowScoring, attempt
   const { generateVocab, getVocab, VocabModal } = window.TW;
 
   const enabled = !!allowScoring;
-  const qKey = `${question.study4_test_id}:${question.question_number}`;
 
   const visibleAttemptId = (() => {
     const id = attempt?.id;
@@ -435,31 +445,45 @@ window.TW.VocabSection = function VocabSection({ question, allowScoring, attempt
   const [vocab, setVocab] = React.useState(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
-  const [loadedKey, setLoadedKey] = React.useState(null);
+  const loadStarted = React.useRef(false);
 
   React.useEffect(() => {
-    if (!enabled) return;
+    if (open) return;
     setVocab(null);
     setError("");
-    setLoadedKey(null);
-    let cancelled = false;
-    async function load() {
-      try {
-        const existing = await getVocab(question.study4_test_id, question.question_number);
-        if (!cancelled) setVocab(existing);
-      } catch (err) {
-        if (!cancelled) setError(err.message || "Could not load vocab");
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, [qKey, enabled]);
+    setLoading(false);
+    loadStarted.current = false;
+  }, [open]);
 
   React.useEffect(() => {
-    if (!open || !enabled) return;
-    if (vocab || loading || (error && loadedKey === qKey)) return;
-    handleGenerate();
-  }, [open, enabled, qKey]);
+    if (!open || !enabled || loadStarted.current) return;
+    loadStarted.current = true;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const existing = await getVocab(question.study4_test_id, question.question_number);
+        if (cancelled) return;
+        if (existing) {
+          setVocab(existing);
+        } else {
+          const payload = await generateVocab(
+            question.study4_test_id,
+            question.question_number,
+            visibleAttemptId
+          );
+          if (cancelled) return;
+          setVocab(payload);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setError(err.message || "Could not load vocab");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, enabled]);
 
   if (!enabled) return null;
 
@@ -473,10 +497,8 @@ window.TW.VocabSection = function VocabSection({ question, allowScoring, attempt
         visibleAttemptId
       );
       setVocab(payload);
-      setLoadedKey(qKey);
     } catch (err) {
       setError(err.message || "Could not generate vocab");
-      setLoadedKey(qKey);
     } finally {
       setLoading(false);
     }
@@ -489,6 +511,7 @@ window.TW.VocabSection = function VocabSection({ question, allowScoring, attempt
       loading={loading}
       error={error}
       regenerating={loading}
+      question={question}
       onClose={() => onOpenChange?.(false)}
       onRegenerate={handleGenerate}
     />
