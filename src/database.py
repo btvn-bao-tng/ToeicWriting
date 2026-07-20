@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any
@@ -316,6 +317,68 @@ class MockExamAttempt(Base):
     updated_at: Mapped[str] = mapped_column(String, nullable=False)
 
 
+class VocabTable(Base):
+    __tablename__ = "vocab_tables"
+    __table_args__ = (
+        UniqueConstraint("user_id", "study4_test_id", "question_number"),
+        Index("idx_vocab_tables_user", "user_id", "id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    attempt_id: Mapped[int | None] = mapped_column(
+        ForeignKey("attempts.id", ondelete="CASCADE"), nullable=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    study4_test_id: Mapped[int] = mapped_column(nullable=False)
+    question_number: Mapped[int] = mapped_column(nullable=False)
+    topic: Mapped[str] = mapped_column(String, nullable=False, default="", server_default="")
+    model: Mapped[str | None] = mapped_column(String)
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+    updated_at: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class VocabCategory(Base):
+    __tablename__ = "vocab_categories"
+    __table_args__ = (
+        Index("idx_vocab_categories_table", "vocab_table_id", "sort_order"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    vocab_table_id: Mapped[int] = mapped_column(
+        ForeignKey("vocab_tables.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    sort_order: Mapped[int] = mapped_column(
+        nullable=False, default=0, server_default="0"
+    )
+
+
+class VocabTerm(Base):
+    __tablename__ = "vocab_terms"
+    __table_args__ = (
+        Index("idx_vocab_terms_table", "vocab_table_id", "sort_order"),
+        Index("idx_vocab_terms_category", "vocab_category_id", "sort_order"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    vocab_category_id: Mapped[int] = mapped_column(
+        ForeignKey("vocab_categories.id", ondelete="CASCADE"), nullable=False
+    )
+    vocab_table_id: Mapped[int] = mapped_column(
+        ForeignKey("vocab_tables.id", ondelete="CASCADE"), nullable=False
+    )
+    term: Mapped[str] = mapped_column(Text, nullable=False)
+    sort_order: Mapped[int] = mapped_column(
+        nullable=False, default=0, server_default="0"
+    )
+    image_url: Mapped[str | None] = mapped_column(Text)
+    image_page_url: Mapped[str | None] = mapped_column(Text)
+    image_photographer: Mapped[str | None] = mapped_column(Text)
+    image_alt: Mapped[str | None] = mapped_column(Text)
+
+
 def _existing_columns(conn: Session, table_name: str) -> set[str]:
     if IS_SQLITE:
         rows = conn.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
@@ -342,6 +405,142 @@ def _migrate() -> None:
                     conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_ddl}"))
 
 
+def _insert_normalized_vocab(conn, vocab_id: int, data: dict[str, Any]) -> None:
+    categories = data.get("categories") or []
+    for cat_idx, category in enumerate(categories):
+        if not isinstance(category, dict):
+            continue
+        name = str(category.get("name") or "").strip()
+        if not name:
+            continue
+        result = conn.execute(
+            text(
+                "INSERT INTO vocab_categories (vocab_table_id, name, sort_order) "
+                "VALUES (:v, :n, :s) RETURNING id"
+            ),
+            {"v": vocab_id, "n": name, "s": cat_idx},
+        )
+        cat_id = result.scalar()
+        items = category.get("items") or []
+        for term_idx, item in enumerate(items):
+            if not isinstance(item, dict):
+                continue
+            term = str(item.get("term") or "").strip()
+            if not term:
+                continue
+            image = item.get("image") if isinstance(item.get("image"), dict) else None
+            conn.execute(
+                text(
+                    "INSERT INTO vocab_terms "
+                    "(vocab_category_id, vocab_table_id, term, sort_order, "
+                    "image_url, image_page_url, image_photographer, image_alt) "
+                    "VALUES (:c, :v, :t, :s, :iu, :ip, :iph, :ia)"
+                ),
+                {
+                    "c": cat_id,
+                    "v": vocab_id,
+                    "t": term,
+                    "s": term_idx,
+                    "iu": image.get("url") if image else None,
+                    "ip": image.get("page_url") if image else None,
+                    "iph": image.get("photographer") if image else None,
+                    "ia": image.get("alt") if image else None,
+                },
+            )
+
+
+def _migrate_vocab_payload() -> None:
+    with engine.begin() as conn:
+        if not _existing_columns(conn, "vocab_tables"):
+            return
+        cols = _existing_columns(conn, "vocab_tables")
+        if "payload" not in cols:
+            return
+        rows = conn.execute(text("SELECT id, payload FROM vocab_tables")).all()
+        for vid, payload_json in rows:
+            if not payload_json:
+                continue
+            already = conn.execute(
+                text(
+                    "SELECT 1 FROM vocab_categories WHERE vocab_table_id = :v LIMIT 1"
+                ),
+                {"v": vid},
+            ).first()
+            if already:
+                continue
+            try:
+                data = json.loads(payload_json)
+            except (json.JSONDecodeError, TypeError):
+                continue
+            _insert_normalized_vocab(conn, vid, data)
+        try:
+            conn.execute(text("ALTER TABLE vocab_tables DROP COLUMN payload"))
+        except Exception:
+            pass
+
+
+def _migrate_vocab_attempt_optional() -> None:
+    if IS_SQLITE:
+        return
+    with engine.begin() as conn:
+        if not _existing_columns(conn, "vocab_tables"):
+            return
+        cols = _existing_columns(conn, "vocab_tables")
+
+        dupes = conn.execute(
+            text(
+                "SELECT user_id, study4_test_id, question_number, max(id) AS keep_id "
+                "FROM vocab_tables GROUP BY user_id, study4_test_id, question_number "
+                "HAVING count(*) > 1"
+            )
+        ).all()
+        for user_id, test_id, q_number, keep_id in dupes:
+            stale = conn.execute(
+                text(
+                    "SELECT id FROM vocab_tables WHERE user_id = :u "
+                    "AND study4_test_id = :t AND question_number = :q AND id <> :k"
+                ),
+                {"u": user_id, "t": test_id, "q": q_number, "k": keep_id},
+            ).all()
+            stale_ids = [row[0] for row in stale]
+            if stale_ids:
+                conn.execute(
+                    text("DELETE FROM vocab_terms WHERE vocab_table_id = ANY(:ids)"),
+                    {"ids": stale_ids},
+                )
+                conn.execute(
+                    text("DELETE FROM vocab_categories WHERE vocab_table_id = ANY(:ids)"),
+                    {"ids": stale_ids},
+                )
+                conn.execute(text("DELETE FROM vocab_tables WHERE id = ANY(:ids)"), {"ids": stale_ids})
+
+        if "attempt_id" in cols:
+            conn.execute(text("ALTER TABLE vocab_tables ALTER COLUMN attempt_id DROP NOT NULL"))
+
+        old_constraint = conn.execute(
+            text(
+                "SELECT conname FROM pg_constraint WHERE conrelid = 'vocab_tables'::regclass "
+                "AND contype = 'u' AND conname = 'vocab_tables_attempt_id_key'"
+            )
+        ).first()
+        if old_constraint:
+            conn.execute(text("ALTER TABLE vocab_tables DROP CONSTRAINT vocab_tables_attempt_id_key"))
+
+        new_constraint = conn.execute(
+            text(
+                "SELECT conname FROM pg_constraint WHERE conrelid = 'vocab_tables'::regclass "
+                "AND contype = 'u' AND conname = 'vocab_tables_uq_user_test_q'"
+            )
+        ).first()
+        if not new_constraint:
+            conn.execute(
+                text(
+                    "ALTER TABLE vocab_tables ADD CONSTRAINT vocab_tables_uq_user_test_q "
+                    "UNIQUE (user_id, study4_test_id, question_number)"
+                )
+            )
+
+
 def init_db() -> None:
     if IS_SQLITE:
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -349,6 +548,8 @@ def init_db() -> None:
             conn.exec_driver_sql("PRAGMA journal_mode = WAL")
     Base.metadata.create_all(bind=engine)
     _migrate()
+    _migrate_vocab_payload()
+    _migrate_vocab_attempt_optional()
 
 
 def get_db() -> Generator[Session, None, None]:

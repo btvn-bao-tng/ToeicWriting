@@ -97,6 +97,8 @@ window.TW.AnswerBox = function AnswerBox({
   onClear,
   saveLabel = "Draft saved to your account",
   onLogin,
+  canViewVocab = false,
+  onViewVocab,
 }) {
   const { countWords } = window.TW;
   const { LINK } = window.TW.classes;
@@ -128,6 +130,18 @@ window.TW.AnswerBox = function AnswerBox({
                 {isScoring ? "Scoring..." : "Save & score"}
               </button>
               {" · "}
+              {canViewVocab && onViewVocab ? (
+                <>
+                  <button
+                    className={`p-0 text-[12px] font-semibold ${LINK}`}
+                    type="button"
+                    onClick={onViewVocab}
+                  >
+                    Vocab + images
+                  </button>
+                  {" · "}
+                </>
+              ) : null}
             </>
           ) : onLogin ? (
             <>
@@ -225,10 +239,13 @@ window.TW.QuestionCard = function QuestionCard({
   saveLabel,
   onLogin,
 }) {
-  const { AnswerBox, partForQuestion, partName } = window.TW;
+  const { AnswerBox, partForQuestion, partName, VocabSection } = window.TW;
   const { PILL_CLASS, CARD, LINK } = window.TW.classes;
   const assets = Array.isArray(question.asset_urls) ? question.asset_urls : [];
   const part = partForQuestion(question, parts);
+  const [vocabOpen, setVocabOpen] = React.useState(false);
+  const latestAttempt = attempts[attempts.length - 1];
+  const canViewVocab = allowScoring;
 
   return (
     <article
@@ -266,9 +283,20 @@ window.TW.QuestionCard = function QuestionCard({
             onClear={onClear}
             saveLabel={saveLabel}
             onLogin={onLogin}
+            canViewVocab={canViewVocab}
+            onViewVocab={() => setVocabOpen(true)}
           />
         </div>
         <FeedbackPanel question={question} attempts={attempts} />
+        {canViewVocab ? (
+          <VocabSection
+            question={question}
+            allowScoring={allowScoring}
+            attempt={latestAttempt}
+            open={vocabOpen}
+            onOpenChange={setVocabOpen}
+          />
+        ) : null}
       </div>
     </article>
   );

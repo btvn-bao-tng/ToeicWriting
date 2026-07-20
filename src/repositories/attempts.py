@@ -9,6 +9,23 @@ from ..database import Attempt
 from ..utils import now
 
 
+def find_attempt(conn: Session, attempt_id: int) -> dict[str, Any] | None:
+    attempt = conn.get(Attempt, attempt_id)
+    if attempt is None:
+        return None
+    return {
+        "id": attempt.id,
+        "user_id": attempt.user_id,
+        "study4_test_id": attempt.study4_test_id,
+        "question_number": attempt.question_number,
+        "answer": attempt.answer,
+        "score_text": attempt.score_text,
+        "score_state": attempt.score_state,
+        "model": attempt.model,
+        "created_at": attempt.created_at,
+    }
+
+
 def insert_attempt(
     conn: Session,
     user_id: int,

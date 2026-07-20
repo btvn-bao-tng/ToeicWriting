@@ -224,8 +224,9 @@ window.TW.App = function App() {
         nextAttempts[key] = [];
       });
 
-      if (currentUser) {
-        const progress = await apiJson(`/api/progress?study4_test_id=${encodeURIComponent(id)}`);
+      const progressRes = await apiFetch(`/api/progress?study4_test_id=${encodeURIComponent(id)}`, { suppressAuthExpired: true });
+      if (progressRes.ok) {
+        const progress = await progressRes.json();
         (progress.drafts || []).forEach((draft) => {
           nextDrafts[`${id}:${draft.question_number}`] = draft.body || "";
         });

@@ -47,10 +47,7 @@ Respond in clean Markdown using this exact section structure. Keep the section h
 ## Score
 X/10
 
-## Evaluation
-- **Word Usage:** [✓/✗ for each required word, with brief note]
-- **Grammar:** [1-2 sentence assessment]
-- **Picture Accuracy:** [1-2 sentence assessment]
+
 
 ## Feedback
 - **Vocabulary issues:** [for each wrong/weak word — quote it → correction → why (wrong meaning, unnatural collocation, too basic, etc.)] (write "None" if none found)
@@ -69,8 +66,14 @@ X/10
 **Why it works:** [note on structure/vocab used, using a different structure than #1]
 
 ## Advanced Grammar & Vocab to Reach 10/10
-- **Grammar:** [2-5 structures relevant to this picture/sentence, with a short example]
-- **Vocabulary:** [3-8 upgraded/ advanced word choices relevant to this picture, with what they replace]
+- **Grammar:** [2-5 structures relevant to this picture/sentence, with a full example for each grammar]
+- **Vocabulary:** [3-8 upgraded/ advanced word choices relevant to this picture, with what they replace, with a full example]
+
+## Evaluation
+- **Word Usage:** [✓/✗ for each required word, with brief note]
+- **Grammar:** [1-2 sentence assessment]
+- **Picture Accuracy:** [1-2 sentence assessment]
+
 ```
 
 ## Important Notes

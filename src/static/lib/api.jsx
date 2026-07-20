@@ -175,3 +175,37 @@ window.TW.streamScore = async function streamScore(question, answer, callbacks =
   if (buffer.trim()) handleEvent(buffer);
   return fullText;
 };
+
+window.TW.generateVocab = async function generateVocab(study4_test_id, question_number, attemptId) {
+  return window.TW.apiJson("/api/vocab", {
+    method: "POST",
+    body: JSON.stringify({
+      study4_test_id,
+      question_number,
+      ...(attemptId ? { attempt_id: attemptId } : {}),
+    }),
+  });
+};
+
+window.TW.getVocab = async function getVocab(study4_test_id, question_number) {
+  const qs = `study4_test_id=${encodeURIComponent(study4_test_id)}&question_number=${encodeURIComponent(question_number)}`;
+  const response = await window.TW.apiFetch(`/api/vocab?${qs}`);
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || `${response.status} ${response.statusText}`);
+  }
+  return response.json();
+};
+
+window.TW.getVocabDetail = async function getVocabDetail(term, topic, mainImageUrl, questionPrompt) {
+  return window.TW.apiJson("/api/vocab/detail", {
+    method: "POST",
+    body: JSON.stringify({
+      term,
+      topic: topic || "",
+      main_image_url: mainImageUrl || null,
+      question_prompt: questionPrompt || "",
+    }),
+  });
+};

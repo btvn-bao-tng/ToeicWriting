@@ -83,3 +83,12 @@ window.TW.isImageInputError = function isImageInputError(message) {
 window.TW.imageInputErrorMessage = function imageInputErrorMessage() {
   return "The current AI model does not support image input, so picture-based questions (Part 1) cannot be scored automatically.";
 };
+
+window.TW.speak = function speak(text) {
+  if (!text || !("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(String(text));
+  utterance.lang = "en-US";
+  utterance.rate = 0.95;
+  window.speechSynthesis.speak(utterance);
+};

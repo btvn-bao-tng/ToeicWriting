@@ -49,3 +49,16 @@ class MockExamResponse(BaseModel):
 class MockExamDraftRequest(BaseModel):
     question_number: int = Field(ge=1, le=8)
     body: str = ""
+
+
+class VocabRequest(BaseModel):
+    attempt_id: int | None = None
+    study4_test_id: int
+    question_number: int = Field(ge=1, le=8)
+
+
+class VocabDetailRequest(BaseModel):
+    term: str = Field(min_length=1, max_length=80)
+    topic: str = Field(default="", max_length=80)
+    main_image_url: str | None = None
+    question_prompt: str = Field(default="", max_length=2000)

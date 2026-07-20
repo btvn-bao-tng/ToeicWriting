@@ -30,6 +30,9 @@ AI_API_KEY = os.getenv("AI_API_KEY", "")
 MAX_IMAGE_ATTACHMENTS = int(os.getenv("MAX_IMAGE_ATTACHMENTS", "3"))
 MAX_IMAGE_BYTES = int(os.getenv("MAX_IMAGE_BYTES", str(8 * 1024 * 1024)))
 
+PEXELS_API_KEY = os.getenv("PEXELS_API_KEY", "")
+PEXELS_SEARCH_TIMEOUT = int(os.getenv("PEXELS_SEARCH_TIMEOUT", "15"))
+
 SESSION_SECRET_KEY = os.getenv("SECRET_KEY", "")
 SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME", "tw_session")
 ALLOW_SIGNUP = os.getenv("ALLOW_SIGNUP", "true").strip().lower() in ("1", "true", "yes", "on")
