@@ -6,49 +6,46 @@ window.TW.VocabTermCell = function VocabTermCell({ item }) {
   return (
     <div className="flex flex-col overflow-hidden rounded-[10px] border border-hairline bg-white">
       {image ? (
-        <button
-          type="button"
-          className="relative block w-full cursor-pointer overflow-hidden bg-pearl"
-          title={`Hear "${item.term}"`}
-          onMouseEnter={() => speak(item.term)}
-          onFocus={() => speak(item.term)}
-          onClick={() => speak(item.term)}
-        >
+        <div className="relative block w-full overflow-hidden bg-pearl">
           <img
             src={image.url}
             alt={image.alt || item.term}
             loading="lazy"
             className="block h-auto w-full object-cover"
           />
-        </button>
+        </div>
       ) : (
-        <button
-          type="button"
-          className="flex aspect-[3/2] w-full cursor-pointer items-center justify-center bg-pearl text-ink-48"
-          title={`Hear "${item.term}"`}
-          onMouseEnter={() => speak(item.term)}
-          onFocus={() => speak(item.term)}
-          onClick={() => speak(item.term)}
-        >
+        <div className="flex aspect-[3/2] w-full items-center justify-center bg-pearl text-ink-48">
           <span className="text-[22px] leading-none">♫</span>
-        </button>
+        </div>
       )}
       <div className="flex flex-col gap-1.5 p-2.5">
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <button
-            type="button"
-            className="text-[15px] font-semibold text-ink hover:text-action"
-            onMouseEnter={() => speak(item.term)}
-            onClick={() => speak(item.term)}
-          >
-            {item.term}
-          </button>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <span className="text-[15px] font-semibold text-ink">{item.term}</span>
           {item.ipa ? <span className="text-[12px] text-ink-48">{item.ipa}</span> : null}
           {item.part_of_speech ? (
             <span className="rounded-full border border-hairline bg-parchment px-1.5 py-0.5 text-[10px] font-medium text-ink-48">
               {item.part_of_speech}
             </span>
           ) : null}
+          <span className="ml-auto flex items-center gap-1">
+            <button
+              type="button"
+              className="flex h-6 w-6 items-center justify-center rounded-full border border-hairline bg-white text-[13px] leading-none text-ink-48 active:scale-95 hover:bg-parchment hover:text-ink"
+              title={`Hear "${item.term}" (US)`}
+              onClick={() => speak(item.term, "us")}
+            >
+              🇺🇸
+            </button>
+            <button
+              type="button"
+              className="flex h-6 w-6 items-center justify-center rounded-full border border-hairline bg-white text-[13px] leading-none text-ink-48 active:scale-95 hover:bg-parchment hover:text-ink"
+              title={`Hear "${item.term}" (UK)`}
+              onClick={() => speak(item.term, "uk")}
+            >
+              🇬🇧
+            </button>
+          </span>
         </div>
         {item.meaning ? (
           <p className="text-[13px] leading-relaxed text-ink-80">{item.meaning}</p>
@@ -267,7 +264,7 @@ window.TW.VocabModal = function VocabModal({ open, vocab, loading, error, onClos
         </div>
 
         <div className="border-t border-hairline bg-parchment px-4 py-2 text-[12px] text-ink-48">
-          Hover an image or word to hear it · use ‹ › or arrow keys to switch groups
+          Click 🇺🇸 or 🇬🇧 next to a word to hear it · use ‹ › or arrow keys to switch groups
         </div>
       </div>
     </div>

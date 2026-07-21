@@ -36,4 +36,7 @@ dist/
 *.db-wal
 data/database.backup-*.db
 
+# Edge TTS audio cache
+data/tts_cache/
+
 zdraft/*

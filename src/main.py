@@ -14,6 +14,7 @@ from .routers import pages as pages_router
 from .routers import progress as progress_router
 from .routers import score as score_router
 from .routers import tests as tests_router
+from .routers import tts as tts_router
 from .routers import vocab as vocab_router
 
 logger = logging.getLogger("uvicorn.error")
@@ -29,6 +30,7 @@ app.include_router(progress_router.router)
 app.include_router(score_router.router)
 app.include_router(mock_exams_router.router)
 app.include_router(vocab_router.router)
+app.include_router(tts_router.router)
 
 
 @app.on_event("startup")
