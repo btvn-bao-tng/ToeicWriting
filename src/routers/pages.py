@@ -10,10 +10,10 @@ router = APIRouter()
 
 
 @router.get("/")
-def index() -> FileResponse:
+async def index() -> FileResponse:
     return FileResponse(INDEX_PATH, headers={"Cache-Control": "no-store"})
 
 
 @router.get("/health")
-def health() -> dict[str, str]:
+async def health() -> dict[str, str]:
     return {"status": "ok", "database": engine.dialect.name}

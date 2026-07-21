@@ -6,6 +6,7 @@ from typing import Any
 
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from .database import db, get_db
 from .repositories import users as users_repo
@@ -63,27 +64,30 @@ def find_current_user(request: Request, conn: Session) -> dict[str, Any] | None:
     return user
 
 
-def current_user(request: Request) -> dict[str, Any] | None:
-    with db() as conn:
-        return find_current_user(request, conn)
+async def current_user(request: Request) -> dict[str, Any] | None:
+    def _load() -> dict[str, Any] | None:
+        with db() as conn:
+            return find_current_user(request, conn)
+
+    return await run_in_threadpool(_load)
 
 
-def require_user(request: Request) -> dict[str, Any]:
-    user = current_user(request)
+async def require_user(request: Request) -> dict[str, Any]:
+    user = await current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
     return user
 
 
-def optional_user(request: Request) -> dict[str, Any] | None:
-    return current_user(request)
+async def optional_user(request: Request) -> dict[str, Any] | None:
+    return await current_user(request)
 
 
-def require_user_with_db(
+async def require_user_with_db(
     request: Request,
     conn: Session = Depends(db_session),
 ) -> dict[str, Any]:
-    user = find_current_user(request, conn)
+    user = await run_in_threadpool(find_current_user, request, conn)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
     return user

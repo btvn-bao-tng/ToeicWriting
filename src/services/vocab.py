@@ -6,6 +6,7 @@ from functools import lru_cache
 from typing import Any
 
 from fastapi import HTTPException
+from starlette.concurrency import run_in_threadpool
 
 from ..config import SYSTEM_PROMPT_DIR
 from ..utils import decode_assets
@@ -151,20 +152,22 @@ def _normalize_table(raw: dict[str, Any]) -> dict[str, Any]:
     return {"topic": topic, "categories": categories}
 
 
-def generate_table(
+async def generate_table(
     question_row: dict[str, Any],
     answer: str,
     score_text: str,
 ) -> dict[str, Any]:
     user_content = build_vocab_user_content(question_row, answer, score_text)
-    raw_text = ai_service.ai_chat(_system_prompt(), user_content)
+    raw_text = await ai_service.ai_chat(_system_prompt(), user_content)
     try:
         raw = _extract_json(raw_text)
         table = _normalize_table(raw)
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=f"Could not parse vocab table: {exc}") from exc
 
-    categories_with_images = image_service.attach_images(table["categories"], table["topic"])
+    categories_with_images = await run_in_threadpool(
+        image_service.attach_images, table["categories"], table["topic"]
+    )
     return {"topic": table["topic"], "categories": categories_with_images}
 
 
@@ -198,7 +201,7 @@ def _cached_term_explanation(term: str, topic: str, question_prompt: str) -> dic
             + question_prompt
         )
     user_text += "\n\nReturn the study-card JSON for this term only."
-    raw_text = ai_service.ai_chat(
+    raw_text = ai_service._ai_chat_sync(
         _detail_system_prompt(), [{"type": "text", "text": user_text}]
     )
     try:
@@ -220,7 +223,7 @@ def _cached_term_explanation(term: str, topic: str, question_prompt: str) -> dic
     }
 
 
-def generate_term_detail(
+async def generate_term_detail(
     term: str,
     topic: str,
     main_image_url: str | None = None,
@@ -230,12 +233,19 @@ def generate_term_detail(
     if not clean_term:
         raise HTTPException(status_code=400, detail="term is required")
 
-    detail = _cached_term_explanation(clean_term, topic, (question_prompt or "").strip())
+    detail = await run_in_threadpool(
+        _cached_term_explanation, clean_term, topic, (question_prompt or "").strip()
+    )
     primary_query = clean_term
-    extras = image_service.search_extra_images(primary_query, exclude_url=main_image_url, count=2)
+    extras = await run_in_threadpool(
+        image_service.search_extra_images, primary_query, exclude_url=main_image_url, count=2
+    )
     if not extras and topic:
-        extras = image_service.search_extra_images(
-            f"{topic} {clean_term}", exclude_url=main_image_url, count=2
+        extras = await run_in_threadpool(
+            image_service.search_extra_images,
+            f"{topic} {clean_term}",
+            exclude_url=main_image_url,
+            count=2,
         )
     detail["images"] = extras
     return detail

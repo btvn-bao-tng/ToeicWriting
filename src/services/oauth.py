@@ -8,6 +8,7 @@ import urllib.request
 from typing import Any
 
 from fastapi import HTTPException, Request
+from starlette.concurrency import run_in_threadpool
 
 from ..config import (
     GOOGLE_CLIENT_ID,
@@ -87,7 +88,7 @@ def _get_json(url: str, bearer: str) -> dict[str, Any]:
         )
 
 
-def exchange_code(code: str, redirect_uri: str) -> dict[str, Any]:
+async def exchange_code(code: str, redirect_uri: str) -> dict[str, Any]:
     data = {
         "code": code,
         "client_id": GOOGLE_CLIENT_ID,
@@ -95,8 +96,8 @@ def exchange_code(code: str, redirect_uri: str) -> dict[str, Any]:
         "redirect_uri": redirect_uri,
         "grant_type": "authorization_code",
     }
-    return _post_form(GOOGLE_TOKEN_URL, data)
+    return await run_in_threadpool(_post_form, GOOGLE_TOKEN_URL, data)
 
 
-def fetch_userinfo(access_token: str) -> dict[str, Any]:
-    return _get_json(GOOGLE_USERINFO_URL, access_token)
+async def fetch_userinfo(access_token: str) -> dict[str, Any]:
+    return await run_in_threadpool(_get_json, GOOGLE_USERINFO_URL, access_token)

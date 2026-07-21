@@ -6,6 +6,7 @@ import urllib.request
 from typing import Any
 
 from fastapi import HTTPException
+from starlette.concurrency import run_in_threadpool
 
 from ..config import AI_API_KEY, AI_BASE_URL, AI_MODEL
 
@@ -14,7 +15,7 @@ def sse_event(event: str, data: Any) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-def ai_chat(system_prompt: str, user_content: Any) -> str:
+def _ai_chat_sync(system_prompt: str, user_content: Any) -> str:
     if not AI_API_KEY:
         raise HTTPException(
             status_code=500,
@@ -52,6 +53,10 @@ def ai_chat(system_prompt: str, user_content: Any) -> str:
         return data["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError) as exc:
         raise HTTPException(status_code=502, detail=f"Unexpected AI response: {data}") from exc
+
+
+async def ai_chat(system_prompt: str, user_content: Any) -> str:
+    return await run_in_threadpool(_ai_chat_sync, system_prompt, user_content)
 
 
 def ai_chat_stream(system_prompt: str, user_content: Any):

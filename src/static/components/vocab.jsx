@@ -51,7 +51,11 @@ window.TW.VocabTermCell = function VocabTermCell({ item }) {
           <p className="text-[13px] leading-relaxed text-ink-80">{item.meaning}</p>
         ) : null}
         {item.example ? (
-          <blockquote className="border-l-2 border-action bg-parchment py-1 pl-2 pr-1.5 text-[12px] leading-relaxed text-ink-80">
+          <blockquote
+            className="cursor-pointer border-l-2 border-action bg-parchment py-1 pl-2 pr-1.5 text-[12px] leading-relaxed text-ink-80 hover:bg-divider active:scale-[0.99]"
+            title={`Hear example (US)`}
+            onClick={() => speak(item.example, "us")}
+          >
             {item.example}
           </blockquote>
         ) : null}

@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from ..config import AI_API_KEY, AI_MODEL
 from ..database import db
@@ -35,114 +36,124 @@ def _visible_questions(payload: dict[str, Any], selected_part: str) -> list[dict
 
 
 @router.post("/api/mock-exams", response_model=MockExamResponse)
-def create_mock_exam(
+async def create_mock_exam(
     request: MockExamCreate,
     user: dict[str, Any] = Depends(require_user_with_db),
     conn: Session = Depends(db_session),
 ) -> dict[str, Any]:
-    payload = content_service.get_test_payload(request.study4_test_id)
+    payload = await run_in_threadpool(content_service.get_test_payload, request.study4_test_id)
     if payload is None:
         raise HTTPException(status_code=404, detail="Test not found")
 
-    exam_id = mock_exams_repo.insert_exam(
-        conn, user["id"], request.study4_test_id, request.selected_part
-    )
-    conn.commit()
+    def _create() -> dict[str, Any] | None:
+        exam_id = mock_exams_repo.insert_exam(
+            conn, user["id"], request.study4_test_id, request.selected_part
+        )
+        conn.commit()
+        return mock_exams_repo.get_exam(conn, user["id"], exam_id)
 
-    exam = mock_exams_repo.get_exam(conn, user["id"], exam_id)
+    exam = await run_in_threadpool(_create)
     if exam is None:
         raise HTTPException(status_code=500, detail="Failed to create mock exam")
     return exam
 
 
 @router.get("/api/mock-exams")
-def list_mock_exams(
+async def list_mock_exams(
     user: dict[str, Any] = Depends(require_user_with_db),
     conn: Session = Depends(db_session),
 ) -> list[dict[str, Any]]:
-    exams = mock_exams_repo.list_exams(conn, user["id"])
-    tests = {t["study4_test_id"]: t for t in content_service.list_tests()}
-    for exam in exams:
-        test = tests.get(exam["study4_test_id"], {})
-        exam["test_title"] = test.get("title", "")
-        exam["duration_minutes"] = test.get("duration_minutes")
-    return exams
+    def _list() -> list[dict[str, Any]]:
+        exams = mock_exams_repo.list_exams(conn, user["id"])
+        tests = {t["study4_test_id"]: t for t in content_service.list_tests()}
+        for exam in exams:
+            test = tests.get(exam["study4_test_id"], {})
+            exam["test_title"] = test.get("title", "")
+            exam["duration_minutes"] = test.get("duration_minutes")
+        return exams
+
+    return await run_in_threadpool(_list)
 
 
 @router.get("/api/mock-exams/{mock_exam_id}")
-def get_mock_exam(
+async def get_mock_exam(
     mock_exam_id: int,
     user: dict[str, Any] = Depends(require_user_with_db),
     conn: Session = Depends(db_session),
 ) -> dict[str, Any]:
-    exam = mock_exams_repo.get_exam(conn, user["id"], mock_exam_id)
+    exam = await run_in_threadpool(mock_exams_repo.get_exam, conn, user["id"], mock_exam_id)
     if exam is None:
         raise HTTPException(status_code=404, detail="Mock exam not found")
 
-    payload = content_service.get_test_payload(exam["study4_test_id"])
+    payload = await run_in_threadpool(content_service.get_test_payload, exam["study4_test_id"])
     if payload is None:
         raise HTTPException(status_code=404, detail="Test not found")
 
-    mock_exams_repo.normalize_streaming(conn, mock_exam_id)
-    drafts = mock_exams_repo.list_drafts(conn, mock_exam_id)
-    attempts = mock_exams_repo.list_attempts(conn, mock_exam_id)
-    result = compute_mock_result(attempts)
+    def _assemble() -> dict[str, Any]:
+        mock_exams_repo.normalize_streaming(conn, mock_exam_id)
+        drafts = mock_exams_repo.list_drafts(conn, mock_exam_id)
+        attempts = mock_exams_repo.list_attempts(conn, mock_exam_id)
+        result = compute_mock_result(attempts)
 
-    visible = _visible_questions(payload, exam["selected_part"])
-    draft_map = {d["question_number"]: d["body"] for d in drafts}
-    attempt_map = {a["question_number"]: a for a in attempts}
+        visible = _visible_questions(payload, exam["selected_part"])
+        draft_map = {d["question_number"]: d["body"] for d in drafts}
+        attempt_map = {a["question_number"]: a for a in attempts}
 
-    questions_out = []
-    for question in visible:
-        number = question["question_number"]
-        attempt = attempt_map.get(number)
-        questions_out.append(
-            {
-                **question,
-                "draft": draft_map.get(number, ""),
-                "attempt": attempt,
-                "converted_score": attempt.get("converted_score") if attempt else None,
-                "max_score": attempt.get("max_score") if attempt else None,
-            }
+        questions_out = []
+        for question in visible:
+            number = question["question_number"]
+            attempt = attempt_map.get(number)
+            questions_out.append(
+                {
+                    **question,
+                    "draft": draft_map.get(number, ""),
+                    "attempt": attempt,
+                    "converted_score": attempt.get("converted_score") if attempt else None,
+                    "max_score": attempt.get("max_score") if attempt else None,
+                }
+            )
+
+        test = payload.get("test", {})
+        parts = payload.get("parts", [])
+        selected_part_label = (
+            "Entire test" if exam["selected_part"] == "all" else f"Part {exam['selected_part']}"
         )
 
-    test = payload.get("test", {})
-    parts = payload.get("parts", [])
-    selected_part_label = (
-        "Entire test" if exam["selected_part"] == "all" else f"Part {exam['selected_part']}"
-    )
+        return {
+            "exam": exam,
+            "test": test,
+            "parts": parts,
+            "selected_part_label": selected_part_label,
+            "questions": questions_out,
+            "drafts": drafts,
+            "attempts": attempts,
+            "result": result,
+        }
 
-    return {
-        "exam": exam,
-        "test": test,
-        "parts": parts,
-        "selected_part_label": selected_part_label,
-        "questions": questions_out,
-        "drafts": drafts,
-        "attempts": attempts,
-        "result": result,
-    }
+    return await run_in_threadpool(_assemble)
 
 
 @router.put("/api/mock-exams/{mock_exam_id}/draft")
-def save_mock_exam_draft(
+async def save_mock_exam_draft(
     mock_exam_id: int,
     body: MockExamDraftRequest,
     user: dict[str, Any] = Depends(require_user_with_db),
     conn: Session = Depends(db_session),
 ) -> dict[str, bool]:
-    exam = mock_exams_repo.get_exam(conn, user["id"], mock_exam_id)
+    exam = await run_in_threadpool(mock_exams_repo.get_exam, conn, user["id"], mock_exam_id)
     if exam is None:
         raise HTTPException(status_code=404, detail="Mock exam not found")
     if exam["status"] == "completed":
         raise HTTPException(status_code=400, detail="Mock exam is already completed")
 
-    mock_exams_repo.upsert_draft(conn, mock_exam_id, body.question_number, body.body)
+    await run_in_threadpool(
+        mock_exams_repo.upsert_draft, conn, mock_exam_id, body.question_number, body.body
+    )
     return {"ok": True}
 
 
 @router.post("/api/mock-exams/{mock_exam_id}/submit")
-def submit_mock_exam(
+async def submit_mock_exam(
     mock_exam_id: int,
     user: dict[str, Any] = Depends(require_user_with_db),
     conn: Session = Depends(db_session),
@@ -153,13 +164,13 @@ def submit_mock_exam(
             detail="AI_API_KEY is not set. Start the server with AI_API_KEY in the environment.",
         )
 
-    exam = mock_exams_repo.get_exam(conn, user["id"], mock_exam_id)
+    exam = await run_in_threadpool(mock_exams_repo.get_exam, conn, user["id"], mock_exam_id)
     if exam is None:
         raise HTTPException(status_code=404, detail="Mock exam not found")
     if exam["status"] == "completed":
         raise HTTPException(status_code=400, detail="Mock exam is already completed")
 
-    payload = content_service.get_test_payload(exam["study4_test_id"])
+    payload = await run_in_threadpool(content_service.get_test_payload, exam["study4_test_id"])
     if payload is None:
         raise HTTPException(status_code=404, detail="Test not found")
 

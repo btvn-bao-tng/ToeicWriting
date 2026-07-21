@@ -4,6 +4,7 @@ import logging
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
 from .config import STATIC_PATH
 from .database import engine, init_db
@@ -34,12 +35,12 @@ app.include_router(tts_router.router)
 
 
 @app.on_event("startup")
-def _startup() -> None:
+async def _startup() -> None:
     logger.info(
         "Starting %s with %s database at %s",
         app.title,
         engine.dialect.name,
         engine.url.render_as_string(hide_password=True),
     )
-    init_db()
+    await run_in_threadpool(init_db)
     logger.info("Database schema is ready")

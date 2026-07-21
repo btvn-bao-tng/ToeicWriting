@@ -5,6 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
+from starlette.concurrency import run_in_threadpool
 
 from ..config import AI_API_KEY, AI_MODEL
 from ..database import db
@@ -18,25 +19,31 @@ router = APIRouter()
 
 
 @router.post("/api/score", response_model=ScoreResponse)
-def score_answer(
+async def score_answer(
     request: ScoreRequest,
     user: dict[str, Any] = Depends(require_user),
 ) -> ScoreResponse:
-    part_order, question_number, system_prompt, user_prompt = scoring_service.score_context(request)
-    score_text = ai_service.ai_chat(system_prompt, user_prompt)
+    part_order, question_number, system_prompt, user_prompt = await run_in_threadpool(
+        scoring_service.score_context, request
+    )
+    score_text = await ai_service.ai_chat(system_prompt, user_prompt)
 
-    with db() as conn:
-        attempt_id = attempts_repo.insert_attempt(
-            conn,
-            user["id"],
-            request.study4_test_id,
-            request.question_number,
-            request.answer,
-            score_text,
-            "visible",
-            AI_MODEL,
-        )
-        conn.commit()
+    def _save() -> int:
+        with db() as conn:
+            attempt_id = attempts_repo.insert_attempt(
+                conn,
+                user["id"],
+                request.study4_test_id,
+                request.question_number,
+                request.answer,
+                score_text,
+                "visible",
+                AI_MODEL,
+            )
+            conn.commit()
+        return attempt_id
+
+    attempt_id = await run_in_threadpool(_save)
 
     return ScoreResponse(
         score_text=score_text,
@@ -48,7 +55,7 @@ def score_answer(
 
 
 @router.post("/api/score/stream")
-def score_answer_stream(
+async def score_answer_stream(
     request: ScoreRequest,
     user: dict[str, Any] = Depends(require_user),
 ) -> StreamingResponse:
@@ -58,7 +65,9 @@ def score_answer_stream(
             detail="AI_API_KEY is not set. Start the server with AI_API_KEY in the environment.",
         )
 
-    _part_order, _question_number, system_prompt, user_prompt = scoring_service.score_context(request)
+    _part_order, _question_number, system_prompt, user_prompt = await run_in_threadpool(
+        scoring_service.score_context, request
+    )
 
     def stream_and_persist():
         with db() as conn:

@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.exc import IntegrityError
+from starlette.concurrency import run_in_threadpool
 
 from ..database import db
 from ..deps import clear_user_cache, current_user, remember_user
@@ -29,42 +30,42 @@ def _require_google_enabled() -> None:
 
 
 @router.post("/api/auth/register")
-def register(body: AuthRequest, request: Request) -> dict[str, Any]:
+async def register(body: AuthRequest, request: Request) -> dict[str, Any]:
     _require_google_enabled()
-    user = auth_service.register_user(body.username, body.password)
+    user = await auth_service.register_user(body.username, body.password)
     remember_user(request, user)
     return user
 
 
 @router.post("/api/auth/login")
-def login(body: AuthRequest, request: Request) -> dict[str, Any]:
+async def login(body: AuthRequest, request: Request) -> dict[str, Any]:
     _require_google_enabled()
-    user = auth_service.authenticate_user(body.username, body.password)
+    user = await auth_service.authenticate_user(body.username, body.password)
     remember_user(request, user)
     return user
 
 
 @router.post("/api/auth/logout")
-def logout(request: Request) -> dict[str, bool]:
+async def logout(request: Request) -> dict[str, bool]:
     request.session.clear()
     return {"ok": True}
 
 
 @router.get("/api/auth/me")
-def auth_me(request: Request) -> dict[str, Any]:
-    user = current_user(request)
+async def auth_me(request: Request) -> dict[str, Any]:
+    user = await current_user(request)
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     return {"id": user["id"], "username": user["username"]}
 
 
 @router.get("/api/auth/providers")
-def auth_providers() -> dict[str, Any]:
+async def auth_providers() -> dict[str, Any]:
     return {"google": oauth_service.google_oauth_enabled()}
 
 
 @router.get("/api/auth/google/login")
-def google_login(request: Request) -> RedirectResponse:
+async def google_login(request: Request) -> RedirectResponse:
     if not oauth_service.google_oauth_enabled():
         raise HTTPException(
             status_code=503, detail="Google OAuth is not configured on this server."
@@ -78,7 +79,7 @@ def google_login(request: Request) -> RedirectResponse:
 
 
 @router.get("/api/auth/google/callback")
-def google_callback(request: Request) -> RedirectResponse:
+async def google_callback(request: Request) -> RedirectResponse:
     if not oauth_service.google_oauth_enabled():
         raise HTTPException(
             status_code=503, detail="Google OAuth is not configured on this server."
@@ -97,12 +98,12 @@ def google_callback(request: Request) -> RedirectResponse:
         )
 
     redirect_uri = oauth_service.resolve_redirect_uri(request)
-    tokens = oauth_service.exchange_code(code, redirect_uri)
+    tokens = await oauth_service.exchange_code(code, redirect_uri)
     access_token = tokens.get("access_token")
     if not access_token:
         raise HTTPException(status_code=502, detail="Google did not return an access token.")
 
-    info = oauth_service.fetch_userinfo(access_token)
+    info = await oauth_service.fetch_userinfo(access_token)
     google_id = info.get("sub")
     email = info.get("email")
     email_verified = info.get("email_verified")
@@ -115,28 +116,32 @@ def google_callback(request: Request) -> RedirectResponse:
             status_code=400, detail="Your Google email is not verified."
         )
 
-    user = None
-    with db() as conn:
-        user = users_repo.find_user_by_google_id(conn, google_id)
-        if user:
-            if user.get("email") != email:
-                users_repo.update_user_email(conn, user["id"], email)
-        else:
-            existing = users_repo.find_user_by_email(conn, email)
-            if existing:
-                users_repo.link_google_id(conn, existing["id"], google_id)
-                user = existing
+    def _save_user() -> dict[str, Any] | None:
+        user: dict[str, Any] | None = None
+        with db() as conn:
+            user = users_repo.find_user_by_google_id(conn, google_id)
+            if user:
+                if user.get("email") != email:
+                    users_repo.update_user_email(conn, user["id"], email)
             else:
-                try:
-                    uid = users_repo.insert_google_user(conn, google_id, email, email)
-                    conn.commit()
-                    user = users_repo.find_user_by_id(conn, uid)
-                except IntegrityError:
-                    conn.rollback()
-                    raise HTTPException(
-                        status_code=409,
-                        detail="Could not create an account from this Google login.",
-                    )
+                existing = users_repo.find_user_by_email(conn, email)
+                if existing:
+                    users_repo.link_google_id(conn, existing["id"], google_id)
+                    user = existing
+                else:
+                    try:
+                        uid = users_repo.insert_google_user(conn, google_id, email, email)
+                        conn.commit()
+                        user = users_repo.find_user_by_id(conn, uid)
+                    except IntegrityError:
+                        conn.rollback()
+                        raise HTTPException(
+                            status_code=409,
+                            detail="Could not create an account from this Google login.",
+                        )
+        return user
+
+    user = await run_in_threadpool(_save_user)
 
     if not user:
         raise HTTPException(status_code=500, detail="Google login failed.")
