@@ -63,6 +63,8 @@ window.TW.App = function App() {
     apiJson,
     partName,
     streamScore,
+    generateVocab,
+    getVocab,
   } = window.TW;
 
   const [currentUser, setCurrentUser] = useState(null);
@@ -82,6 +84,8 @@ window.TW.App = function App() {
   const [lastQuestionNumber, setLastQuestionNumber] = useState(() => Number(localStorage.getItem(LAST_QUESTION_KEY)) || null);
   const draftTimers = useRef({});
   const pendingDrafts = useRef({});
+  const vocabPrefetched = useRef(new Set());
+  const attemptsRef = useRef(attempts);
 
   function navigate(nextRoute) {
     const hash = buildHash(nextRoute);
@@ -96,6 +100,64 @@ window.TW.App = function App() {
   const modeLabel = selectedPart === "all"
     ? "Full test"
     : partName(parts.find((part) => String(part.sort_order) === String(selectedPart)));
+
+  useEffect(() => { attemptsRef.current = attempts; }, [attempts]);
+
+  function visibleAttemptIdFor(q) {
+    const list = attemptsRef.current[progressKey(q)] || [];
+    const a = list[list.length - 1];
+    if (!a) return null;
+    const id = a.id;
+    if (!id || String(id).startsWith("temp-")) return null;
+    if (a.score?.state !== "visible") return null;
+    return id;
+  }
+
+  // When a question scrolls into view, warm the vocab cache for it and the
+  // next 2 questions by calling POST /api/vocab (generates + saves on the
+  // server). Results are stored in window.TW.vocabCache so the modal opens
+  // instantly. Each question is requested at most once per session.
+  function prefetchVocab(activeQuestion) {
+    const idx = questions.findIndex((q) => q.question_number === activeQuestion.question_number);
+    if (idx === -1) return;
+    const targets = questions.slice(idx, idx + 3);
+    for (const q of targets) {
+      const key = progressKey(q);
+      if (vocabPrefetched.current.has(key)) continue;
+      vocabPrefetched.current.add(key);
+      const attemptId = visibleAttemptIdFor(q);
+      (async () => {
+        try {
+          const existing = await getVocab(q.study4_test_id, q.question_number);
+          const payload = existing
+            ? existing
+            : await generateVocab(q.study4_test_id, q.question_number, attemptId);
+          if (window.TW.vocabCache) window.TW.vocabCache[key] = payload;
+        } catch (_err) {
+          vocabPrefetched.current.delete(key);
+        }
+      })();
+    }
+  }
+
+  useEffect(() => {
+    if (route.view !== "practice" || !currentUser || !questions.length) return;
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries.filter((e) => e.isIntersecting);
+      if (!visible.length) return;
+      visible.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+      const el = visible[0].target;
+      const match = el.id && el.id.match(/^question-(.+)$/);
+      if (!match) return;
+      const active = questions.find((q) => String(q.id) === match[1]);
+      if (active) prefetchVocab(active);
+    }, { rootMargin: "0px 0px -55% 0px", threshold: 0 });
+    questions.forEach((q) => {
+      const el = document.getElementById(`question-${q.id}`);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, [questions, route.view, currentUser]);
 
   useEffect(() => {
     async function boot() {
@@ -122,6 +184,7 @@ window.TW.App = function App() {
       Object.values(draftTimers.current).forEach(clearTimeout);
       draftTimers.current = {};
       pendingDrafts.current = {};
+      vocabPrefetched.current = new Set();
       setCurrentUser(null);
       setDrafts({});
       setAttempts({});
@@ -206,6 +269,7 @@ window.TW.App = function App() {
     setCurrentPayload(null);
     setLoadingTest(true);
     setLoadError("");
+    vocabPrefetched.current = new Set();
     if (options.remember !== false) {
       localStorage.setItem(LAST_TEST_KEY, String(id));
       localStorage.setItem(LAST_PART_KEY, nextPart);
@@ -460,6 +524,7 @@ window.TW.App = function App() {
     Object.values(draftTimers.current).forEach(clearTimeout);
     draftTimers.current = {};
     pendingDrafts.current = {};
+    vocabPrefetched.current = new Set();
     setCurrentUser(null);
     setDrafts({});
     setAttempts({});

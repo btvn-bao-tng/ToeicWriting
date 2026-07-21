@@ -132,11 +132,14 @@ def attach_images(
 ) -> list[dict[str, Any]]:
     jobs: list[tuple[int, int, str]] = []
     for cat_index, category in enumerate(categories):
-        terms = category.get("terms") or []
-        for term_index, term in enumerate(terms):
-            if not isinstance(term, str) or not term.strip():
+        items = category.get("items") or []
+        for term_index, item in enumerate(items):
+            if not isinstance(item, dict):
                 continue
-            jobs.append((cat_index, term_index, term.strip()))
+            term = str(item.get("term") or "").strip()
+            if not term:
+                continue
+            jobs.append((cat_index, term_index, term))
 
     results: dict[tuple[int, int], dict[str, Any] | None] = {}
     if jobs:
@@ -153,13 +156,17 @@ def attach_images(
 
     out_categories: list[dict[str, Any]] = []
     for cat_index, category in enumerate(categories):
-        terms = category.get("terms") or []
-        items: list[dict[str, Any]] = []
-        for term_index, term in enumerate(terms):
-            if not isinstance(term, str) or not term.strip():
+        items = category.get("items") or []
+        out_items: list[dict[str, Any]] = []
+        for term_index, item in enumerate(items):
+            if not isinstance(item, dict):
                 continue
-            image = results.get((cat_index, term_index))
-            items.append({"term": term.strip(), "image": image})
-        out_categories.append({"name": category.get("name") or "", "items": items})
+            term = str(item.get("term") or "").strip()
+            if not term:
+                continue
+            enriched = dict(item)
+            enriched["image"] = results.get((cat_index, term_index))
+            out_items.append(enriched)
+        out_categories.append({"name": category.get("name") or "", "items": out_items})
 
     return out_categories

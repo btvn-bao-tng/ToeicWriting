@@ -82,6 +82,30 @@ def _extract_json(text: str) -> dict[str, Any]:
         raise ValueError(f"Invalid JSON: {exc.msg}") from exc
 
 
+def _item_from_raw(raw_item: Any) -> dict[str, Any] | None:
+    if isinstance(raw_item, str):
+        raw_item = {"term": raw_item}
+    if not isinstance(raw_item, dict):
+        return None
+    term = str(raw_item.get("term") or "").strip()
+    if not term:
+        return None
+    return {
+        "term": term,
+        "part_of_speech": str(raw_item.get("part_of_speech") or "").strip(),
+        "ipa": str(raw_item.get("ipa") or "").strip(),
+        "meaning": str(
+            raw_item.get("meaning") or raw_item.get("explanation") or ""
+        ).strip(),
+        "example": str(raw_item.get("example") or "").strip(),
+        "vietnamese_meaning": str(
+            raw_item.get("vietnamese_meaning")
+            or raw_item.get("vietnamese")
+            or ""
+        ).strip(),
+    }
+
+
 def _normalize_table(raw: dict[str, Any]) -> dict[str, Any]:
     topic = str(raw.get("topic") or "").strip().upper()
     raw_categories = raw.get("categories")
@@ -98,25 +122,26 @@ def _normalize_table(raw: dict[str, Any]) -> dict[str, Any]:
         name = str(category.get("name") or "").strip().upper()
         if not name:
             continue
-        terms_in: list[Any] = category.get("terms") or []
-        if not isinstance(terms_in, list):
+        raw_items = category.get("items")
+        if not isinstance(raw_items, list):
+            raw_items = category.get("terms") or []
+        if not isinstance(raw_items, list):
             continue
-        clean_terms: list[str] = []
-        for term in terms_in[:MAX_TERMS_PER_CATEGORY]:
+        clean_items: list[dict[str, Any]] = []
+        for raw_item in raw_items[:MAX_TERMS_PER_CATEGORY]:
             if total >= MAX_TOTAL_TERMS:
                 break
-            if not isinstance(term, str):
+            item = _item_from_raw(raw_item)
+            if item is None:
                 continue
-            key = term.strip().lower()
-            if not key:
-                continue
+            key = item["term"].lower()
             if key in seen:
                 continue
             seen.add(key)
-            clean_terms.append(term.strip())
+            clean_items.append(item)
             total += 1
-        if clean_terms:
-            categories.append({"name": name, "terms": clean_terms})
+        if clean_items:
+            categories.append({"name": name, "items": clean_items})
         if total >= MAX_TOTAL_TERMS:
             break
 

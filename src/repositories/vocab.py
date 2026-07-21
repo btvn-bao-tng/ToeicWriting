@@ -83,6 +83,11 @@ def upsert_vocab_table(
                     image_page_url=(image.get("page_url") if image else None),
                     image_photographer=(image.get("photographer") if image else None),
                     image_alt=(image.get("alt") if image else None),
+                    part_of_speech=(str(item.get("part_of_speech") or "").strip() or None),
+                    ipa=(str(item.get("ipa") or "").strip() or None),
+                    meaning=(str(item.get("meaning") or "").strip() or None),
+                    example=(str(item.get("example") or "").strip() or None),
+                    vietnamese_meaning=(str(item.get("vietnamese_meaning") or "").strip() or None),
                 )
             )
     conn.flush()
@@ -114,7 +119,15 @@ def _assemble_payload(conn: Session, row: VocabTable) -> dict[str, Any]:
                 }
             else:
                 image = None
-            items.append({"term": t.term, "image": image})
+            items.append({
+                "term": t.term,
+                "image": image,
+                "part_of_speech": t.part_of_speech or "",
+                "ipa": t.ipa or "",
+                "meaning": t.meaning or "",
+                "example": t.example or "",
+                "vietnamese_meaning": t.vietnamese_meaning or "",
+            })
         categories.append({"name": cat.name, "items": items})
 
     return {

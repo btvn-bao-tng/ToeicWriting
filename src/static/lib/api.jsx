@@ -209,3 +209,5 @@ window.TW.getVocabDetail = async function getVocabDetail(term, topic, mainImageU
     }),
   });
 };
+
+window.TW.vocabCache = {};

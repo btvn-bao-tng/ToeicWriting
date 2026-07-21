@@ -84,11 +84,28 @@ window.TW.imageInputErrorMessage = function imageInputErrorMessage() {
   return "The current AI model does not support image input, so picture-based questions (Part 1) cannot be scored automatically.";
 };
 
+window.TW.pickEnglishVoice = function pickEnglishVoice() {
+  const voices = window.speechSynthesis.getVoices() || [];
+  return (
+    voices.find((v) => v.lang === "en-US") ||
+    voices.find((v) => v.lang && v.lang.toLowerCase().startsWith("en-us")) ||
+    voices.find((v) => v.lang && v.lang.toLowerCase().startsWith("en")) ||
+    null
+  );
+};
+
 window.TW.speak = function speak(text) {
   if (!text || !("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(String(text));
   utterance.lang = "en-US";
   utterance.rate = 0.95;
+  const voice = window.TW.pickEnglishVoice();
+  if (voice) utterance.voice = voice;
   window.speechSynthesis.speak(utterance);
 };
+
+if ("speechSynthesis" in window) {
+  window.speechSynthesis.onvoiceschanged = () => {};
+  window.speechSynthesis.getVoices();
+}

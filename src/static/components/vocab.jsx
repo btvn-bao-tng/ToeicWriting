@@ -1,216 +1,71 @@
-window.TW.VocabTermCell = function VocabTermCell({ item, onOpenDetail }) {
+window.TW.VocabTermCell = function VocabTermCell({ item }) {
   const { speak } = window.TW;
   const image = item.image;
+  const vn = item.vietnamese_meaning;
 
   return (
-    <div className="group flex flex-col gap-1.5">
+    <div className="flex flex-col overflow-hidden rounded-[10px] border border-hairline bg-white">
       {image ? (
         <button
           type="button"
-          className="relative block w-full cursor-pointer overflow-hidden rounded-[8px] border border-hairline bg-white"
-          title={`Click to study "${item.term}" · hover to hear`}
+          className="relative block w-full cursor-pointer overflow-hidden bg-pearl"
+          title={`Hear "${item.term}"`}
           onMouseEnter={() => speak(item.term)}
           onFocus={() => speak(item.term)}
-          onClick={() => onOpenDetail(item)}
+          onClick={() => speak(item.term)}
         >
           <img
             src={image.url}
             alt={image.alt || item.term}
             loading="lazy"
-            className="block h-auto w-full object-cover transition group-hover:opacity-90"
+            className="block h-auto w-full object-cover"
           />
-          <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-black/45 px-1.5 py-0.5 text-[11px] font-medium text-white opacity-0 transition group-hover:opacity-100">
-            {item.term}
-          </span>
         </button>
       ) : (
         <button
           type="button"
-          className="flex aspect-[3/2] w-full cursor-pointer items-center justify-center rounded-[8px] border border-dashed border-hairline bg-pearl text-ink-48 transition hover:border-action hover:text-action"
-          title={`Click to study "${item.term}" · hover to hear`}
+          className="flex aspect-[3/2] w-full cursor-pointer items-center justify-center bg-pearl text-ink-48"
+          title={`Hear "${item.term}"`}
           onMouseEnter={() => speak(item.term)}
           onFocus={() => speak(item.term)}
-          onClick={() => onOpenDetail(item)}
-        >
-          <span className="flex flex-col items-center gap-1">
-            <span className="text-[20px] leading-none">♫</span>
-            <span className="text-[12px] font-medium">{item.term}</span>
-          </span>
-        </button>
-      )}
-      <span className="self-start text-[13px] font-medium text-ink-80">{item.term}</span>
-    </div>
-  );
-};
-
-function DetailImage({ image, term }) {
-  const { speak } = window.TW;
-  if (!image) return null;
-  return (
-    <a
-      className="group/img relative block overflow-hidden rounded-[8px] border border-hairline bg-white"
-      href={image.page_url}
-      target="_blank"
-      rel="noreferrer"
-      title={`Hover to hear · open on Pexels${image.photographer ? ` · by ${image.photographer}` : ""}`}
-      onMouseEnter={() => speak(term)}
-      onFocus={() => speak(term)}
-    >
-      <img
-        src={image.url}
-        alt={image.alt || term}
-        loading="lazy"
-        className="block h-auto w-full object-cover transition group-hover/img:opacity-90"
-      />
-    </a>
-  );
-}
-
-window.TW.VocabTermDetail = function VocabTermDetail({ item, topic, questionPrompt, onBack }) {
-  const { getVocabDetail, speak } = window.TW;
-  const { BTN_UTILITY, LINK } = window.TW.classes;
-  const [detail, setDetail] = React.useState(null);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState("");
-
-  React.useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError("");
-    setDetail(null);
-    getVocabDetail(item.term, topic, item.image?.url, questionPrompt)
-      .then((d) => { if (!cancelled) setDetail(d); })
-      .catch((err) => { if (!cancelled) setError(err.message || "Could not load details"); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [item.term, topic, item.image?.url, questionPrompt]);
-
-  const extraImages = detail?.images || [];
-
-  return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between gap-3 border-b border-hairline px-3 py-2">
-        <button type="button" className={`text-[13px] ${LINK}`} onClick={onBack}>
-          ← Back to vocab
-        </button>
-        <button
-          type="button"
-          className={`${BTN_UTILITY} !text-[12px]`}
-          title="Hear the word"
-          onMouseEnter={() => speak(item.term)}
           onClick={() => speak(item.term)}
         >
-          ♫ {item.term}
+          <span className="text-[22px] leading-none">♫</span>
         </button>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-auto p-3">
-        {loading ? (
-          <div className="flex h-full min-h-[160px] items-center justify-center text-[14px] text-ink-48">
-            <span className="inline-flex items-center gap-2">
-              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-action border-t-transparent" />
-              Loading details...
+      )}
+      <div className="flex flex-col gap-1.5 p-2.5">
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <button
+            type="button"
+            className="text-[15px] font-semibold text-ink hover:text-action"
+            onMouseEnter={() => speak(item.term)}
+            onClick={() => speak(item.term)}
+          >
+            {item.term}
+          </button>
+          {item.ipa ? <span className="text-[12px] text-ink-48">{item.ipa}</span> : null}
+          {item.part_of_speech ? (
+            <span className="rounded-full border border-hairline bg-parchment px-1.5 py-0.5 text-[10px] font-medium text-ink-48">
+              {item.part_of_speech}
             </span>
-          </div>
-        ) : error ? (
-          <div className="rounded-[11px] border border-red-200 bg-red-50 p-3 text-[14px] text-red-800">{error}</div>
-        ) : (
-          <div className="mx-auto max-w-[640px]">
-            <div className="mb-3">
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <h3 className="text-[22px] font-semibold leading-tight text-ink">{detail?.term || item.term}</h3>
-                {detail?.ipa ? <span className="text-[15px] text-ink-48">{detail.ipa}</span> : null}
-                {detail?.part_of_speech ? (
-                  <span className="rounded-full border border-hairline bg-parchment px-2 py-0.5 text-[11px] font-medium text-ink-48">
-                    {detail.part_of_speech}
-                  </span>
-                ) : null}
-                {detail?.register ? (
-                  <span className="rounded-full border border-hairline bg-white px-2 py-0.5 text-[11px] font-medium text-action">
-                    {detail.register}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-
-            {detail?.explanation ? (
-              <div className="mb-3">
-                <h4 className="mb-1 text-[12px] font-semibold tracking-wide text-ink-48">MEANING</h4>
-                <p className="text-[15px] leading-relaxed text-ink-80">{detail.explanation}</p>
-              </div>
-            ) : null}
-
-            {detail?.example ? (
-              <div className="mb-4">
-                <h4 className="mb-1 text-[12px] font-semibold tracking-wide text-ink-48">EXAMPLE</h4>
-                <blockquote className="rounded-[11px] border-l-4 border-action bg-parchment py-2 pl-3 pr-2 text-[15px] leading-relaxed text-ink-80">
-                  {detail.example}
-                </blockquote>
-              </div>
-            ) : null}
-
-            {detail?.synonyms?.length ? (
-              <div className="mb-4">
-                <h4 className="mb-1.5 text-[12px] font-semibold tracking-wide text-ink-48">SYNONYMS · hover to hear</h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {detail.synonyms.map((syn, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      className="rounded-full border border-hairline bg-white px-2.5 py-1 text-[13px] font-medium text-ink-80 transition hover:border-action hover:text-action active:scale-95"
-                      title="Hover to hear"
-                      onMouseEnter={() => speak(syn)}
-                      onFocus={() => speak(syn)}
-                      onClick={() => speak(syn)}
-                    >
-                      {syn}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {detail?.collocations?.length ? (
-              <div className="mb-4">
-                <h4 className="mb-1.5 text-[12px] font-semibold tracking-wide text-ink-48">COLLOCATIONS · hover to hear</h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {detail.collocations.map((col, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      className="rounded-full border border-hairline bg-pearl px-2.5 py-1 text-[13px] text-ink-80 transition hover:border-action hover:text-action active:scale-95"
-                      title="Hover to hear"
-                      onMouseEnter={() => speak(col)}
-                      onFocus={() => speak(col)}
-                      onClick={() => speak(col)}
-                    >
-                      {col}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {extraImages.length ? (
-              <div>
-                <h4 className="mb-2 text-[12px] font-semibold tracking-wide text-ink-48">MORE IMAGES</h4>
-                <div className="grid grid-cols-2 gap-2.5">
-                  {extraImages.map((img, i) => (
-                    <DetailImage key={i} image={img} term={item.term} />
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        )}
+          ) : null}
+        </div>
+        {item.meaning ? (
+          <p className="text-[13px] leading-relaxed text-ink-80">{item.meaning}</p>
+        ) : null}
+        {item.example ? (
+          <blockquote className="border-l-2 border-action bg-parchment py-1 pl-2 pr-1.5 text-[12px] leading-relaxed text-ink-80">
+            {item.example}
+          </blockquote>
+        ) : null}
+        {vn ? (
+          <p className="text-[12px] font-medium text-action">
+            <span className="text-ink-48">VN:</span> {vn}
+          </p>
+        ) : null}
       </div>
     </div>
   );
-};
-
-window.TW.vocabStripHtml = function vocabStripHtml(html) {
-  if (!html) return "";
-  return String(html).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 };
 
 window.TW.QuestionPicture = function QuestionPicture({ question }) {
@@ -220,7 +75,7 @@ window.TW.QuestionPicture = function QuestionPicture({ question }) {
 
   return (
     <div className="flex h-full flex-col gap-3">
-      <strong className="text-[12px] font-semibold uppercase tracking-wide text-ink-48">Question picture</strong>
+      <strong className="text-[12px] font-semibold uppercase tracking-wide text-ink-48">Question</strong>
       {assets.length ? (
         <div className="flex flex-wrap gap-2">
           {assets.map((url, i) => (
@@ -241,26 +96,21 @@ window.TW.QuestionPicture = function QuestionPicture({ question }) {
           className="[&_img]:hidden [&_p]:mb-1.5 text-[13px] leading-relaxed text-ink-80"
           dangerouslySetInnerHTML={{ __html: promptHtml }}
         />
-      ) : null}
-      {promptText ? (
-        <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink-80">{promptText}</p>
-      ) : null}
+      ) : <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink-80">{promptText}</p>}
     </div>
   );
 };
 
 window.TW.VocabModal = function VocabModal({ open, vocab, loading, error, onClose, onRegenerate, regenerating, question }) {
   const { BTN_UTILITY: Btn } = window.TW.classes;
-  const { VocabTermCell: TermCell, VocabTermDetail: TermDetail, QuestionPicture } = window.TW;
+  const { VocabTermCell: TermCell, QuestionPicture } = window.TW;
   const categories = vocab?.categories || [];
 
   const [catIndex, setCatIndex] = React.useState(0);
-  const [detailItem, setDetailItem] = React.useState(null);
 
   React.useEffect(() => {
     if (open) {
       setCatIndex(0);
-      setDetailItem(null);
     }
   }, [open, vocab]);
 
@@ -268,11 +118,10 @@ window.TW.VocabModal = function VocabModal({ open, vocab, loading, error, onClos
     if (!open) return;
     function onKey(e) {
       if (e.key === "Escape") {
-        if (detailItem) setDetailItem(null);
-        else onClose();
-      } else if (e.key === "ArrowLeft" && !detailItem) {
+        onClose();
+      } else if (e.key === "ArrowLeft") {
         setCatIndex((i) => Math.max(0, i - 1));
-      } else if (e.key === "ArrowRight" && !detailItem) {
+      } else if (e.key === "ArrowRight") {
         setCatIndex((i) => Math.min(categories.length - 1, i + 1));
       }
     }
@@ -282,22 +131,19 @@ window.TW.VocabModal = function VocabModal({ open, vocab, loading, error, onClos
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
     };
-  }, [open, onClose, detailItem, categories.length]);
+  }, [open, onClose, categories.length]);
 
   if (!open) return null;
 
   const current = categories[catIndex];
-  const questionPromptText = question
-    ? [question.prompt_text || "", window.TW.vocabStripHtml(question.prompt_html)].filter(Boolean).join(" ")
-    : "";
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="relative flex h-[100dvh] w-screen flex-col overflow-hidden bg-white"
+        className="relative flex h-[90dvh] w-[90vw] flex-col overflow-hidden rounded-[14px] bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline bg-parchment px-4 py-3">
@@ -339,9 +185,7 @@ window.TW.VocabModal = function VocabModal({ open, vocab, loading, error, onClos
           ) : null}
 
           <div className="min-w-0 flex-1 overflow-hidden">
-          {detailItem ? (
-            <TermDetail item={detailItem} topic={vocab?.topic || ""} questionPrompt={question ? questionPromptText : ""} onBack={() => setDetailItem(null)} />
-          ) : error ? (
+          {error ? (
             <div className="flex h-full items-center justify-center p-4">
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-[11px] border border-red-200 bg-red-50 p-3 text-[14px] text-red-800">
                 <span>{error}</span>
@@ -403,9 +247,9 @@ window.TW.VocabModal = function VocabModal({ open, vocab, loading, error, onClos
                 {current ? (
                   <>
                     <h4 className="mb-2 text-[13px] font-semibold tracking-wide text-ink-48">{current.name}</h4>
-                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                       {current.items.map((item, i) => (
-                        <TermCell key={i} item={item} onOpenDetail={setDetailItem} />
+                        <TermCell key={i} item={item} />
                       ))}
                     </div>
                   </>
@@ -423,7 +267,7 @@ window.TW.VocabModal = function VocabModal({ open, vocab, loading, error, onClos
         </div>
 
         <div className="border-t border-hairline bg-parchment px-4 py-2 text-[12px] text-ink-48">
-          Hover an image to hear the word · click an image to study it · use ‹ › or arrow keys to switch groups
+          Hover an image or word to hear it · use ‹ › or arrow keys to switch groups
         </div>
       </div>
     </div>
@@ -446,18 +290,20 @@ window.TW.VocabSection = function VocabSection({ question, allowScoring, attempt
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const loadStarted = React.useRef(false);
+  const cacheKey = `${question.study4_test_id}:${question.question_number}`;
 
-  React.useEffect(() => {
-    if (open) return;
-    setVocab(null);
-    setError("");
-    setLoading(false);
-    loadStarted.current = false;
-  }, [open]);
-
+  // The App prefetches vocab for the question in view + the next 2 (see the
+  // IntersectionObserver in app.jsx) and stores results in window.TW.vocabCache.
+  // When the modal opens we prefer that prefetched data so it appears instantly;
+  // otherwise we fetch the saved table, and only generate (POST) on demand.
+  // Loaded data is kept on close so reopening is instant.
   React.useEffect(() => {
     if (!open || !enabled || loadStarted.current) return;
     loadStarted.current = true;
+    if (window.TW.vocabCache && window.TW.vocabCache[cacheKey]) {
+      setVocab(window.TW.vocabCache[cacheKey]);
+      return;
+    }
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -474,6 +320,7 @@ window.TW.VocabSection = function VocabSection({ question, allowScoring, attempt
           );
           if (cancelled) return;
           setVocab(payload);
+          if (window.TW.vocabCache) window.TW.vocabCache[cacheKey] = payload;
         }
       } catch (err) {
         if (cancelled) return;
@@ -483,7 +330,7 @@ window.TW.VocabSection = function VocabSection({ question, allowScoring, attempt
       }
     })();
     return () => { cancelled = true; };
-  }, [open, enabled]);
+  }, [open, enabled, cacheKey]);
 
   if (!enabled) return null;
 
@@ -497,6 +344,7 @@ window.TW.VocabSection = function VocabSection({ question, allowScoring, attempt
         visibleAttemptId
       );
       setVocab(payload);
+      if (window.TW.vocabCache) window.TW.vocabCache[cacheKey] = payload;
     } catch (err) {
       setError(err.message || "Could not generate vocab");
     } finally {

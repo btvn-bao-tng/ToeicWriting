@@ -377,6 +377,11 @@ class VocabTerm(Base):
     image_page_url: Mapped[str | None] = mapped_column(Text)
     image_photographer: Mapped[str | None] = mapped_column(Text)
     image_alt: Mapped[str | None] = mapped_column(Text)
+    part_of_speech: Mapped[str | None] = mapped_column(Text)
+    ipa: Mapped[str | None] = mapped_column(Text)
+    meaning: Mapped[str | None] = mapped_column(Text)
+    example: Mapped[str | None] = mapped_column(Text)
+    vietnamese_meaning: Mapped[str | None] = mapped_column(Text)
 
 
 def _existing_columns(conn: Session, table_name: str) -> set[str]:
@@ -395,6 +400,13 @@ def _migrate() -> None:
         "users": [
             ("google_id", "VARCHAR UNIQUE"),
             ("email", "VARCHAR"),
+        ],
+        "vocab_terms": [
+            ("part_of_speech", "TEXT"),
+            ("ipa", "TEXT"),
+            ("meaning", "TEXT"),
+            ("example", "TEXT"),
+            ("vietnamese_meaning", "TEXT"),
         ],
     }
     for table_name, columns in additions.items():
