@@ -8,10 +8,11 @@ from typing import Any
 from fastapi import HTTPException
 from starlette.concurrency import run_in_threadpool
 
-from ..config import SYSTEM_PROMPT_DIR
+from ..config import MAX_IMAGE_ATTACHMENTS, SYSTEM_PROMPT_DIR
 from ..utils import decode_assets
 from . import ai as ai_service
 from . import images as image_service
+from .scoring import fetch_image_as_data_url
 
 VOCAB_SYSTEM_PROMPT_PATH = SYSTEM_PROMPT_DIR / "vocab.md"
 VOCAB_DETAIL_PROMPT_PATH = SYSTEM_PROMPT_DIR / "vocab_detail.md"
@@ -57,11 +58,41 @@ def build_vocab_user_content(
         f"User answer:\n{answer}",
         f"Examiner feedback:\n{score_text or ''}",
         (
-            "Using the scene described above, generate the topic-grouped "
-            "vocabulary study table as a single JSON object only."
+            "Using the scene shown in the attached images (or described above), "
+            "generate the topic-grouped vocabulary study table as a single JSON "
+            "object only."
         ),
     ]
-    return [{"type": "text", "text": "\n\n".join(lines)}]
+    content: list[dict[str, Any]] = [{"type": "text", "text": "\n\n".join(lines)}]
+
+    failures: list[str] = []
+    for index, url in enumerate(assets[:MAX_IMAGE_ATTACHMENTS], start=1):
+        data_url, error = fetch_image_as_data_url(url)
+        if error:
+            failures.append(error)
+            continue
+        content.append(
+            {
+                "type": "image_url",
+                "image_url": {"url": data_url, "detail": "high"},
+            }
+        )
+        content.append({"type": "text", "text": f"Attached image {index}: {url}"})
+
+    if len(assets) > MAX_IMAGE_ATTACHMENTS:
+        failures.append(
+            f"{len(assets) - MAX_IMAGE_ATTACHMENTS} image(s) were skipped by MAX_IMAGE_ATTACHMENTS"
+        )
+    if failures:
+        content.append(
+            {
+                "type": "text",
+                "text": "Image fetch notes:\n"
+                + "\n".join(f"- {failure}" for failure in failures),
+            }
+        )
+
+    return content
 
 
 def _extract_json(text: str) -> dict[str, Any]:
@@ -91,6 +122,10 @@ def _item_from_raw(raw_item: Any) -> dict[str, Any] | None:
     term = str(raw_item.get("term") or "").strip()
     if not term:
         return None
+    raw_synonyms = raw_item.get("synonyms")
+    if not isinstance(raw_synonyms, list):
+        raw_synonyms = []
+    synonyms = [str(s).strip() for s in raw_synonyms if str(s).strip()]
     return {
         "term": term,
         "part_of_speech": str(raw_item.get("part_of_speech") or "").strip(),
@@ -98,6 +133,7 @@ def _item_from_raw(raw_item: Any) -> dict[str, Any] | None:
         "meaning": str(
             raw_item.get("meaning") or raw_item.get("explanation") or ""
         ).strip(),
+        "synonyms": synonyms,
         "example": str(raw_item.get("example") or "").strip(),
         "vietnamese_meaning": str(
             raw_item.get("vietnamese_meaning")
@@ -157,7 +193,9 @@ async def generate_table(
     answer: str,
     score_text: str,
 ) -> dict[str, Any]:
-    user_content = build_vocab_user_content(question_row, answer, score_text)
+    user_content = await run_in_threadpool(
+        build_vocab_user_content, question_row, answer, score_text
+    )
     raw_text = await ai_service.ai_chat(_system_prompt(), user_content)
     try:
         raw = _extract_json(raw_text)

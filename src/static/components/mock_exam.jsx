@@ -78,6 +78,7 @@ window.TW.MockExamScreen = function MockExamScreen({
     submitMockExamStream,
     listMockExams,
     partName,
+    MockExamTakingSkeleton,
   } = window.TW;
   const { PILL_CLASS, CARD, BTN_PRIMARY, BTN_UTILITY, LINK } = window.TW.classes;
 
@@ -336,7 +337,7 @@ window.TW.MockExamScreen = function MockExamScreen({
   }
 
   if (loading && !activeExam) {
-    return <EmptyState>Loading mock exam...</EmptyState>;
+    return <MockExamTakingSkeleton />;
   }
 
   if (!activeExam) {

@@ -382,6 +382,7 @@ class VocabTerm(Base):
     meaning: Mapped[str | None] = mapped_column(Text)
     example: Mapped[str | None] = mapped_column(Text)
     vietnamese_meaning: Mapped[str | None] = mapped_column(Text)
+    synonyms: Mapped[str | None] = mapped_column(Text)
 
 
 def _existing_columns(conn: Session, table_name: str) -> set[str]:
@@ -407,6 +408,7 @@ def _migrate() -> None:
             ("meaning", "TEXT"),
             ("example", "TEXT"),
             ("vietnamese_meaning", "TEXT"),
+            ("synonyms", "TEXT"),
         ],
     }
     for table_name, columns in additions.items():

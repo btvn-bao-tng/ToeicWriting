@@ -50,6 +50,19 @@ window.TW.VocabTermCell = function VocabTermCell({ item }) {
         {item.meaning ? (
           <p className="text-[13px] leading-relaxed text-ink-80">{item.meaning}</p>
         ) : null}
+        {Array.isArray(item.synonyms) && item.synonyms.length ? (
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-ink-48">syn:</span>
+            {item.synonyms.map((s, i) => (
+              <span
+                key={i}
+                className="rounded-full border border-hairline bg-parchment px-1.5 py-0.5 text-[11px] text-ink-80"
+              >
+                {s}
+              </span>
+            ))}
+          </div>
+        ) : null}
         {item.example ? (
           <blockquote
             className="cursor-pointer border-l-2 border-action bg-parchment py-1 pl-2 pr-1.5 text-[12px] leading-relaxed text-ink-80 hover:bg-divider active:scale-[0.99]"
@@ -104,7 +117,7 @@ window.TW.QuestionPicture = function QuestionPicture({ question }) {
 
 window.TW.VocabModal = function VocabModal({ open, vocab, loading, error, onClose, onRegenerate, regenerating, question }) {
   const { BTN_UTILITY: Btn } = window.TW.classes;
-  const { VocabTermCell: TermCell, QuestionPicture } = window.TW;
+  const { VocabTermCell: TermCell, QuestionPicture, VocabGridSkeleton } = window.TW;
   const categories = vocab?.categories || [];
 
   const [catIndex, setCatIndex] = React.useState(0);
@@ -196,12 +209,7 @@ window.TW.VocabModal = function VocabModal({ open, vocab, loading, error, onClos
               </div>
             </div>
           ) : loading ? (
-            <div className="flex h-full items-center justify-center text-[15px] text-ink-48">
-              <span className="inline-flex items-center gap-2">
-                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-action border-t-transparent" />
-                Generating vocab &amp; images...
-              </span>
-            </div>
+            <VocabGridSkeleton />
           ) : categories.length ? (
             <div className="flex h-full flex-col">
               <div className="flex items-center gap-2 border-b border-hairline px-3 py-2">

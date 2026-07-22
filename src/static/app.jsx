@@ -65,11 +65,16 @@ window.TW.App = function App() {
     streamScore,
     generateVocab,
     getVocab,
+    TestListSkeleton,
+    TestActionsSkeleton,
+    PracticeSkeleton,
+    MockExamSkeleton,
   } = window.TW;
 
   const [currentUser, setCurrentUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [tests, setTests] = useState([]);
+  const [loadingTests, setLoadingTests] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
   const [selectedPart, setSelectedPart] = useState(() => localStorage.getItem(LAST_PART_KEY) || "all");
   const [route, setRoute] = useState(parseHash);
@@ -257,9 +262,14 @@ window.TW.App = function App() {
   }
 
   async function loadTests() {
-    const nextTests = await apiJson("/api/tests");
-    setTests(nextTests);
-    setStatus(`${nextTests.length} tests loaded`);
+    setLoadingTests(true);
+    try {
+      const nextTests = await apiJson("/api/tests");
+      setTests(nextTests);
+      setStatus(`${nextTests.length} tests loaded`);
+    } finally {
+      setLoadingTests(false);
+    }
   }
 
   async function loadTest(id, options = {}) {
@@ -539,8 +549,10 @@ window.TW.App = function App() {
       <>
         <Header status={status} />
       <main className="px-4 py-8 sm:px-6 sm:py-12">
-        <EmptyState>Checking session...</EmptyState>
-        </main>
+        <section className="mx-auto min-w-0 max-w-5xl">
+          <TestListSkeleton />
+        </section>
+      </main>
       </>
     );
   }
@@ -566,10 +578,18 @@ window.TW.App = function App() {
             </div>
           ) : null}
           {loadError ? <EmptyState error>{loadError}</EmptyState> : null}
-          {!loadError && loadingTest ? <EmptyState>Loading test...</EmptyState> : null}
+          {!loadError && loadingTest ? (
+            view === "practice" ? <PracticeSkeleton /> :
+            view === "mock" ? <MockExamSkeleton /> :
+            <TestActionsSkeleton />
+          ) : null}
 
           {!loadError && !loadingTest && view === "tests" ? (
-            <TestList tests={tests} selectedId={selectedId} onSelect={handleSelectTest} />
+            loadingTests && !tests.length ? (
+              <TestListSkeleton />
+            ) : (
+              <TestList tests={tests} selectedId={selectedId} onSelect={handleSelectTest} />
+            )
           ) : null}
 
           {!loadError && !loadingTest && view === "actions" && currentPayload ? (

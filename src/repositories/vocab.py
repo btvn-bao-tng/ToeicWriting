@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from sqlalchemy import delete, select
@@ -73,6 +74,11 @@ def upsert_vocab_table(
             if not term:
                 continue
             image = item.get("image") if isinstance(item.get("image"), dict) else None
+            raw_synonyms = item.get("synonyms")
+            if not isinstance(raw_synonyms, list):
+                raw_synonyms = []
+            synonyms_list = [str(s).strip() for s in raw_synonyms if str(s).strip()]
+            synonyms_json = json.dumps(synonyms_list, ensure_ascii=False) if synonyms_list else None
             conn.add(
                 VocabTerm(
                     vocab_category_id=cat.id,
@@ -88,6 +94,7 @@ def upsert_vocab_table(
                     meaning=(str(item.get("meaning") or "").strip() or None),
                     example=(str(item.get("example") or "").strip() or None),
                     vietnamese_meaning=(str(item.get("vietnamese_meaning") or "").strip() or None),
+                    synonyms=synonyms_json,
                 )
             )
     conn.flush()
@@ -119,12 +126,21 @@ def _assemble_payload(conn: Session, row: VocabTable) -> dict[str, Any]:
                 }
             else:
                 image = None
+            synonyms: list[str] = []
+            if t.synonyms:
+                try:
+                    parsed = json.loads(t.synonyms)
+                    if isinstance(parsed, list):
+                        synonyms = [str(s) for s in parsed if s]
+                except (json.JSONDecodeError, TypeError):
+                    synonyms = []
             items.append({
                 "term": t.term,
                 "image": image,
                 "part_of_speech": t.part_of_speech or "",
                 "ipa": t.ipa or "",
                 "meaning": t.meaning or "",
+                "synonyms": synonyms,
                 "example": t.example or "",
                 "vietnamese_meaning": t.vietnamese_meaning or "",
             })

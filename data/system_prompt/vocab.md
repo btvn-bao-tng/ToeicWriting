@@ -15,6 +15,7 @@ Return **ONLY** a single JSON object (no prose, no Markdown fences, no commentar
           "part_of_speech": "noun",
           "ipa": "/ˌriːsɛpʃənɪst/",
           "meaning": "A person whose job is to greet visitors and answer calls in an office.",
+          "synonyms": ["clerk", "desk worker", "greeter"],
           "example": "The receptionist greeted the visitor and directed him to the correct desk.",
           "vietnamese_meaning": "nhân viên lễ tân"
         }
@@ -35,6 +36,7 @@ Return **ONLY** a single JSON object (no prose, no Markdown fences, no commentar
   - Adjectives: prefer sophisticated, descriptive words (`attentive` over `paying attention`, `engrossed` over `busy`, `meticulous` over `careful`).
   - Include advanced collocations and phrasal combinations a strong learner would use (`take a phone call`, `seated at a workstation`, `leafing through a ledger`).
   - Pull directly from the examiner's feedback: it often names better word choices the learner could have used — surface those upgrades.
+- **Pair each advanced term with simple synonyms** (see `synonyms` below). The point is to show the learner a plain, familiar word next to the advanced one so they can connect the two (e.g. `assist` ↔ `help`, `meticulous` ↔ `careful`, `ledger` ↔ `record book`).
 - Terms must still be **image-searchable** on a photo site (single words or short noun/verb phrases). Avoid abstract-only concepts that no photo could illustrate (e.g. `efficiency`, `productivity`); choose a concrete, picturable variant instead.
 - Do not duplicate a term across the whole table (case-insensitive).
 - Mix difficulty: it is fine to include a couple of accessible terms so the table is usable, but the majority should be advanced.
@@ -44,6 +46,7 @@ Return **ONLY** a single JSON object (no prose, no Markdown fences, no commentar
 - `part_of_speech`: one short label (noun, verb, phrasal verb, adjective, adverb, phrase, etc.).
 - `ipa`: the IPA pronunciation of the term. Use standard British or American IPA consistently. One IPA string.
 - `meaning`: a clear, learner-friendly English definition in 1 short sentence. Plain English, specific to the term (not the whole scene).
+- `synonyms`: an array of **1 to 3 simple, common synonyms** — plain everyday words a beginner already knows that mean the same as (or nearly the same as) the advanced `term` in this context (e.g. for `receptionist` → `["clerk", "desk worker"]`; for `meticulous` → `["careful", "thorough"]`; for `assist` → `["help"]`). These act as a bridge so learners can connect the advanced word to vocabulary they already recognize. Prefer the simplest, most familiar phrasing; do not include other advanced words here.
 - `example`: ONE natural, complete example sentence using the term. **When a picture/prompt description is provided, the example MUST describe or relate to that specific scene** — reference the people, objects, actions, or setting shown so the learner sees the word used in the exact context they are studying. Do not quote the learner's own answer. If no picture description is given, make the example fit the topic/scene.
 - `vietnamese_meaning`: the Vietnamese translation/meaning **as the term is used in this specific context** (not a generic dictionary gloss). Keep it short — a word or short phrase. Prefer full Vietnamese with proper tone marks (e.g. `nhân viên lễ tân`).
 - Keep each card concise so the whole table stays compact.
