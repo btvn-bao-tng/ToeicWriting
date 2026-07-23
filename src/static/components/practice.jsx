@@ -92,6 +92,7 @@ window.TW.AnswerBox = function AnswerBox({
   draft,
   isScoring,
   allowScoring = true,
+  readOnly = false,
   onDraftChange,
   onScore,
   onClear,
@@ -111,60 +112,75 @@ window.TW.AnswerBox = function AnswerBox({
         <span>{countWords(draft)} words · {draft.length} chars</span>
       </div>
       <textarea
-        className={`w-full resize-y rounded-[11px] border border-hairline bg-white px-3 py-2.5 font-sans text-[15px] leading-normal text-ink focus:border-action focus:outline-none focus:ring-2 focus:ring-action-focus/30 ${partHeight}`}
+        className={`w-full resize-y rounded-[11px] border border-hairline px-3 py-2.5 font-sans text-[15px] leading-normal text-ink focus:outline-none ${readOnly ? "bg-parchment text-ink-80" : "bg-white focus:border-action focus:ring-2 focus:ring-action-focus/30"} ${partHeight}`}
         value={draft}
         spellCheck="false"
+        readOnly={readOnly}
         onChange={(event) => onDraftChange(question, event.target.value)}
       />
       <div className="mt-1.5 flex items-center justify-between gap-3 text-[12px] text-ink-48">
         <span>{saveLabel}</span>
         <span>
-          {allowScoring ? (
-            <>
+          {readOnly ? (
+            canViewVocab && onViewVocab ? (
               <button
-                className={`p-0 text-[12px] font-semibold ${LINK} disabled:opacity-70`}
+                className={`p-0 text-[12px] font-semibold ${LINK}`}
                 type="button"
-                disabled={isScoring}
-                onClick={() => onScore(question)}
+                onClick={onViewVocab}
               >
-                {isScoring ? "Scoring..." : "Save & score"}
+                Vocab + images
               </button>
-              {" · "}
-              {canViewVocab && onViewVocab ? (
+            ) : null
+          ) : (
+            <>
+              {allowScoring ? (
+                <>
+                  <button
+                    className={`p-0 text-[12px] font-semibold ${LINK} disabled:opacity-70`}
+                    type="button"
+                    disabled={isScoring}
+                    onClick={() => onScore(question)}
+                  >
+                    {isScoring ? "Scoring..." : "Save & score"}
+                  </button>
+                  {" · "}
+                  {canViewVocab && onViewVocab ? (
+                    <>
+                      <button
+                        className={`p-0 text-[12px] font-semibold ${LINK}`}
+                        type="button"
+                        onClick={onViewVocab}
+                      >
+                        Vocab + images
+                      </button>
+                      {" · "}
+                    </>
+                  ) : null}
+                </>
+              ) : onLogin ? (
                 <>
                   <button
                     className={`p-0 text-[12px] font-semibold ${LINK}`}
                     type="button"
-                    onClick={onViewVocab}
+                    onClick={onLogin}
                   >
-                    Vocab + images
+                    Login to score
                   </button>
                   {" · "}
                 </>
               ) : null}
-            </>
-          ) : onLogin ? (
-            <>
-              <button
-                className={`p-0 text-[12px] font-semibold ${LINK}`}
-                type="button"
-                onClick={onLogin}
-              >
-                Login to score
+              <button className={`p-0 text-[12px] font-semibold ${LINK}`} type="button" onClick={() => onClear(question)}>
+                Clear
               </button>
-              {" · "}
             </>
-          ) : null}
-          <button className={`p-0 text-[12px] font-semibold ${LINK}`} type="button" onClick={() => onClear(question)}>
-            Clear
-          </button>
+          )}
         </span>
       </div>
     </div>
   );
 };
 
-function FeedbackPanel({ question, attempts }) {
+function FeedbackPanel({ question, attempts, readOnly = false }) {
   const { countWords, ScoreResult } = window.TW;
   const { CARD } = window.TW.classes;
   const storageKey = `toeic-sw-writing-feedback-collapsed:${question.study4_test_id}:${question.question_number}`;
@@ -203,16 +219,22 @@ function FeedbackPanel({ question, attempts }) {
       {!isCollapsed ? (
         <div className="mt-2">
           {attempt ? (
-            <section className={`${CARD}`}>
-              <div className="flex items-start justify-between gap-3 border-b border-hairline px-3 py-2 text-[12px] text-ink-48">
-                <strong className="font-semibold text-ink">Latest response</strong>
-                <span>{countWords(attempt.answer)} words · {attempt.answer.length} chars</span>
-              </div>
-              <p className="whitespace-pre-wrap border-b border-hairline px-3 py-2 text-[15px] text-ink-80">{attempt.answer}</p>
-              <div className="px-3 pb-3">
+            readOnly ? (
+              <section className={`${CARD} px-3 pb-3 pt-2`}>
                 <ScoreResult score={attempt.score} />
-              </div>
-            </section>
+              </section>
+            ) : (
+              <section className={`${CARD}`}>
+                <div className="flex items-start justify-between gap-3 border-b border-hairline px-3 py-2 text-[12px] text-ink-48">
+                  <strong className="font-semibold text-ink">Latest response</strong>
+                  <span>{countWords(attempt.answer)} words · {attempt.answer.length} chars</span>
+                </div>
+                <p className="whitespace-pre-wrap border-b border-hairline px-3 py-2 text-[15px] text-ink-80">{attempt.answer}</p>
+                <div className="px-3 pb-3">
+                  <ScoreResult score={attempt.score} />
+                </div>
+              </section>
+            )
           ) : (
             <div className="rounded-[18px] border border-dashed border-hairline bg-white p-4 text-[15px] text-ink-48">
               Save and score an answer to see feedback here.
@@ -232,6 +254,8 @@ window.TW.QuestionCard = function QuestionCard({
   attempts,
   isScoring,
   allowScoring = true,
+  readOnly = false,
+  canViewVocab,
   onDraftChange,
   onScore,
   onClear,
@@ -247,7 +271,7 @@ window.TW.QuestionCard = function QuestionCard({
   const part = partForQuestion(question, parts);
   const [vocabOpen, setVocabOpen] = React.useState(false);
   const latestAttempt = attempts[attempts.length - 1];
-  const canViewVocab = allowScoring;
+  const viewVocab = canViewVocab ?? allowScoring;
 
   return (
     <article
@@ -280,20 +304,21 @@ window.TW.QuestionCard = function QuestionCard({
             draft={draft}
             isScoring={isScoring}
             allowScoring={allowScoring}
+            readOnly={readOnly}
             onDraftChange={onDraftChange}
             onScore={onScore}
             onClear={onClear}
             saveLabel={saveLabel}
             onLogin={onLogin}
-            canViewVocab={canViewVocab}
+            canViewVocab={viewVocab}
             onViewVocab={() => setVocabOpen(true)}
           />
         </div>
-        <FeedbackPanel question={question} attempts={attempts} />
-        {canViewVocab ? (
+        <FeedbackPanel question={question} attempts={attempts} readOnly={readOnly} />
+        {viewVocab ? (
           <VocabSection
             question={question}
-            allowScoring={allowScoring}
+            allowScoring={viewVocab}
             attempt={latestAttempt}
             open={vocabOpen}
             onOpenChange={setVocabOpen}

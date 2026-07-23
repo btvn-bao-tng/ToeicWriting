@@ -124,8 +124,9 @@ window.TW.useAppState = function useAppState() {
 
   useEffect(() => {
     async function boot() {
+      let user = null;
       try {
-        const user = await apiJson("/api/auth/me", { suppressAuthExpired: true });
+        user = await apiJson("/api/auth/me", { suppressAuthExpired: true });
         setCurrentUser(user);
       } catch (error) {
         if (error.status && error.status !== 401) {

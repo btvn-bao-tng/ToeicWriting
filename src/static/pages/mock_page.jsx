@@ -1,6 +1,6 @@
 window.TW.MockPage = function MockPage({ app }) {
   const { MockExamScreen } = window.TW;
-  const { currentPayload, route, setStatus, navigate, isGuest, handleLogin } = app;
+  const { currentPayload, route, setStatus, navigate, isGuest, handleLogin, revisionSavedKeys, handleToggleRevision } = app;
 
   if (isGuest) {
     return (
@@ -25,6 +25,8 @@ window.TW.MockPage = function MockPage({ app }) {
       onLeave={() => navigate({ view: "actions", testId: currentPayload.test.study4_test_id, mockExamId: null })}
       onStartMockExam={(id) => navigate({ view: "mock", testId: currentPayload.test.study4_test_id, mockExamId: id })}
       onNewMockExam={() => navigate({ view: "mock", testId: currentPayload.test.study4_test_id, mockExamId: null })}
+      revisionSavedKeys={revisionSavedKeys}
+      onToggleRevision={handleToggleRevision}
     />
   );
 };

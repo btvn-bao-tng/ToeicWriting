@@ -58,6 +58,21 @@ function formatDate(iso) {
   }
 }
 
+function shapeMockAttempt(attempt) {
+  return [
+    {
+      id: `temp-mock-${attempt.id}`,
+      answer: attempt.answer || "",
+      created_at: attempt.created_at,
+      model: attempt.model,
+      score: {
+        state: attempt.score_state || "visible",
+        text: attempt.score_text || "",
+      },
+    },
+  ];
+}
+
 window.TW.MockExamScreen = function MockExamScreen({
   currentPayload,
   initialMockExamId,
@@ -65,12 +80,13 @@ window.TW.MockExamScreen = function MockExamScreen({
   onLeave,
   onStartMockExam,
   onNewMockExam,
+  revisionSavedKeys,
+  onToggleRevision,
 }) {
   const {
     EmptyState,
     TestSummary,
     QuestionCard,
-    ScoreResult,
     apiJson,
     createMockExam,
     getMockExam,
@@ -466,28 +482,39 @@ window.TW.MockExamScreen = function MockExamScreen({
         </section>
 
         <section className="space-y-3">
-          <h3 className="text-[21px] font-semibold tracking-tight text-ink">Feedback</h3>
-          {(activeExam.attempts || []).map((attempt) => {
-            const question = questions.find((q) => q.question_number === attempt.question_number);
-            if (!question) return null;
-            return (
-              <article key={attempt.id} className={`${CARD} p-4`}>
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <strong className="text-[15px] font-semibold text-ink">Question {attempt.question_number}</strong>
-                  <span className="rounded-full border border-hairline bg-white px-3 py-1 text-[12px] text-ink-48">
-                    {attempt.converted_score} / {attempt.max_score}
-                  </span>
-                </div>
-                <div className="mb-2 text-[12px] text-ink-48">Practice score: {attempt.score_10 ?? "-"} / 10</div>
-                <ScoreResult
-                  score={{
-                    state: attempt.score_state,
-                    text: attempt.score_text,
-                  }}
+          <h3 className="text-[21px] font-semibold tracking-tight text-ink">Questions & feedback</h3>
+          {questions.length ? (
+            questions.map((question, index) => {
+              const attempt = (activeExam.attempts || []).find(
+                (a) => a.question_number === question.question_number
+              );
+              const answer = attempt?.answer ?? question.draft ?? "";
+              const shaped = attempt ? shapeMockAttempt(attempt) : [];
+              return (
+                <QuestionCard
+                  key={question.id}
+                  question={question}
+                  index={index}
+                  parts={parts}
+                  draft={answer}
+                  attempts={shaped}
+                  isScoring={false}
+                  allowScoring={false}
+                  canViewVocab
+                  readOnly
+                  onDraftChange={() => {}}
+                  onScore={() => {}}
+                  onClear={() => {}}
+                  onActivate={() => {}}
+                  saveLabel="Submitted answer"
+                  revisionSavedKeys={revisionSavedKeys}
+                  onToggleRevision={onToggleRevision}
                 />
-              </article>
-            );
-          })}
+              );
+            })
+          ) : (
+            <EmptyState>No questions found for this part.</EmptyState>
+          )}
         </section>
 
         <div className="flex gap-3">
