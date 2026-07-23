@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from sqlalchemy import select
@@ -7,6 +8,31 @@ from sqlalchemy.orm import Session
 
 from ..database import User
 from ..utils import now
+
+_USERNAME_MAX = 32
+_USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{3,32}$")
+
+
+def _sanitize_google_username(email: str) -> str:
+    base = email.split("@")[0] if "@" in email else email
+    base = re.sub(r"[^A-Za-z0-9_.-]", "", base)
+    if not _USERNAME_RE.match(base):
+        base = "g" + base
+    if len(base) > _USERNAME_MAX:
+        base = base[:_USERNAME_MAX]
+    if not _USERNAME_RE.match(base):
+        base = "google_user"
+    return base
+
+
+def _ensure_unique_username(conn: Session, username: str) -> str:
+    candidate = username
+    suffix = 1
+    while conn.scalar(select(User).where(User.username == candidate)) is not None:
+        trimmed = username[: _USERNAME_MAX - len(str(suffix))]
+        candidate = f"{trimmed}{suffix}"
+        suffix += 1
+    return candidate
 
 
 def insert_user(
@@ -72,8 +98,9 @@ def find_user_by_email(
 
 
 def insert_google_user(
-    conn: Session, google_id: str, email: str, username: str
+    conn: Session, google_id: str, email: str, _username: str
 ) -> int:
+    username = _ensure_unique_username(conn, _sanitize_google_username(email))
     user = User(
         username=username,
         password_hash="",

@@ -21,17 +21,8 @@ logger = logging.getLogger("uvicorn.error")
 OAUTH_REDIRECT_TARGET = "/#/tests"
 
 
-def _require_google_enabled() -> None:
-    if not oauth_service.google_oauth_enabled():
-        raise HTTPException(
-            status_code=503,
-            detail="Username/password login is disabled. Google login is not configured on this server.",
-        )
-
-
 @router.post("/api/auth/register")
 async def register(body: AuthRequest, request: Request) -> dict[str, Any]:
-    _require_google_enabled()
     user = await auth_service.register_user(body.username, body.password)
     remember_user(request, user)
     return user
@@ -39,7 +30,6 @@ async def register(body: AuthRequest, request: Request) -> dict[str, Any]:
 
 @router.post("/api/auth/login")
 async def login(body: AuthRequest, request: Request) -> dict[str, Any]:
-    _require_google_enabled()
     user = await auth_service.authenticate_user(body.username, body.password)
     remember_user(request, user)
     return user

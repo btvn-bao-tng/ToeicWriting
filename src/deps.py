@@ -42,7 +42,7 @@ def clear_user_cache() -> None:
     cached_user_identity.cache_clear()
 
 
-def find_current_user(request: Request, conn: Session) -> dict[str, Any] | None:
+def find_current_user(request: Request) -> dict[str, Any] | None:
     user: dict[str, Any] | None = session_user(request)
     if user:
         return user
@@ -65,11 +65,7 @@ def find_current_user(request: Request, conn: Session) -> dict[str, Any] | None:
 
 
 async def current_user(request: Request) -> dict[str, Any] | None:
-    def _load() -> dict[str, Any] | None:
-        with db() as conn:
-            return find_current_user(request, conn)
-
-    return await run_in_threadpool(_load)
+    return await run_in_threadpool(find_current_user, request)
 
 
 async def require_user(request: Request) -> dict[str, Any]:
@@ -87,7 +83,7 @@ async def require_user_with_db(
     request: Request,
     conn: Session = Depends(db_session),
 ) -> dict[str, Any]:
-    user = await run_in_threadpool(find_current_user, request, conn)
+    user = await run_in_threadpool(find_current_user, request)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
     return user

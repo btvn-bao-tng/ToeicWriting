@@ -122,7 +122,7 @@ window.TW.QuestionPicture = function QuestionPicture({ question }) {
       {promptHtml ? (
         <div
           className="[&_img]:hidden [&_p]:mb-1.5 text-[13px] leading-relaxed text-ink-80"
-          dangerouslySetInnerHTML={{ __html: promptHtml }}
+          dangerouslySetInnerHTML={{ __html: window.TW.sanitizeHtml(promptHtml) }}
         />
       ) : <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink-80">{promptText}</p>}
     </div>

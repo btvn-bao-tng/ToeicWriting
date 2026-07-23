@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..database import MockExam, MockExamAttempt, MockExamDraft
@@ -90,19 +90,6 @@ def complete_exam(
     exam.scaled_score = scaled_score
     exam.completed_at = timestamp
     exam.updated_at = timestamp
-
-
-def delete_exam(
-    conn: Session,
-    user_id: int,
-    mock_exam_id: int,
-) -> None:
-    conn.execute(
-        delete(MockExam).where(
-            MockExam.id == mock_exam_id,
-            MockExam.user_id == user_id,
-        )
-    )
 
 
 def upsert_draft(

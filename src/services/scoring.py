@@ -11,7 +11,7 @@ from fastapi import HTTPException
 
 from ..config import MAX_IMAGE_ATTACHMENTS, MAX_IMAGE_BYTES, SYSTEM_PROMPT_DIR
 from ..schemas import ScoreRequest
-from ..utils import decode_assets
+from ..utils import decode_assets, is_safe_fetch_url
 from . import content as content_service
 
 
@@ -45,6 +45,9 @@ def guess_image_mime(url: str, content_type: str | None) -> str:
 
 
 def fetch_image_as_data_url(url: str) -> tuple[str | None, str | None]:
+    if not is_safe_fetch_url(url):
+        return None, f"{url} was blocked by SSRF protection"
+
     request = urllib.request.Request(
         url,
         headers={

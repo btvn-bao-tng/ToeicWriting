@@ -8,7 +8,7 @@ from .config import MIN_PASSWORD
 class ScoreRequest(BaseModel):
     study4_test_id: int
     question_number: int = Field(ge=1, le=8)
-    answer: str
+    answer: str = Field(max_length=20000)
 
 
 class ScoreResponse(BaseModel):

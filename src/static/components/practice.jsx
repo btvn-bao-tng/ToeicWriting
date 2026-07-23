@@ -78,7 +78,7 @@ function PromptHtml({ html, text }) {
     return (
       <div
         className="[&_img]:mb-2.5 [&_img]:block [&_img]:h-auto [&_img]:max-w-[min(100%,520px)] [&_img]:rounded-[8px] [&_img]:border [&_img]:border-hairline [&_img]:bg-white [&_p]:mb-2.5 [&_p:last-child]:mb-0"
-        dangerouslySetInnerHTML={{ __html: html }}
+        dangerouslySetInnerHTML={{ __html: window.TW.sanitizeHtml(html) }}
       />
     );
   }

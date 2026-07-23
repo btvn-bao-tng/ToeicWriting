@@ -102,49 +102,73 @@ def upsert_vocab_table(
 
 
 def _assemble_payload(conn: Session, row: VocabTable) -> dict[str, Any]:
-    cat_rows = conn.execute(
-        select(VocabCategory)
+    rows = conn.execute(
+        select(
+            VocabCategory.id.label("cat_id"),
+            VocabCategory.name.label("cat_name"),
+            VocabCategory.sort_order.label("cat_sort"),
+            VocabTerm.id.label("term_id"),
+            VocabTerm.term,
+            VocabTerm.sort_order.label("term_sort"),
+            VocabTerm.image_url,
+            VocabTerm.image_page_url,
+            VocabTerm.image_photographer,
+            VocabTerm.image_alt,
+            VocabTerm.part_of_speech,
+            VocabTerm.ipa,
+            VocabTerm.meaning,
+            VocabTerm.example,
+            VocabTerm.vietnamese_meaning,
+            VocabTerm.synonyms,
+        )
+        .outerjoin(
+            VocabTerm,
+            VocabTerm.vocab_category_id == VocabCategory.id,
+        )
         .where(VocabCategory.vocab_table_id == row.id)
-        .order_by(VocabCategory.sort_order, VocabCategory.id)
-    ).scalars().all()
+        .order_by(
+            VocabCategory.sort_order,
+            VocabCategory.id,
+            VocabTerm.sort_order,
+            VocabTerm.id,
+        )
+    ).all()
 
     categories: list[dict[str, Any]] = []
-    for cat in cat_rows:
-        term_rows = conn.execute(
-            select(VocabTerm)
-            .where(VocabTerm.vocab_category_id == cat.id)
-            .order_by(VocabTerm.sort_order, VocabTerm.id)
-        ).scalars().all()
-        items: list[dict[str, Any]] = []
-        for t in term_rows:
-            if t.image_url:
+    current_cat: dict[str, Any] | None = None
+    for r in rows:
+        m = r._mapping
+        if current_cat is None or m["cat_id"] != current_cat["cat_id"]:
+            current_cat = {"cat_id": m["cat_id"], "name": m["cat_name"], "items": []}
+            categories.append(current_cat)
+        if m["term_id"] is not None:
+            if m["image_url"]:
                 image = {
-                    "url": t.image_url,
-                    "page_url": t.image_page_url,
-                    "photographer": t.image_photographer or "",
-                    "alt": t.image_alt,
+                    "url": m["image_url"],
+                    "page_url": m["image_page_url"],
+                    "photographer": m["image_photographer"] or "",
+                    "alt": m["image_alt"],
                 }
             else:
                 image = None
             synonyms: list[str] = []
-            if t.synonyms:
+            if m["synonyms"]:
                 try:
-                    parsed = json.loads(t.synonyms)
+                    parsed = json.loads(m["synonyms"])
                     if isinstance(parsed, list):
                         synonyms = [str(s) for s in parsed if s]
                 except (json.JSONDecodeError, TypeError):
                     synonyms = []
-            items.append({
-                "term": t.term,
+            current_cat["items"].append({
+                "term": m["term"],
                 "image": image,
-                "part_of_speech": t.part_of_speech or "",
-                "ipa": t.ipa or "",
-                "meaning": t.meaning or "",
+                "part_of_speech": m["part_of_speech"] or "",
+                "ipa": m["ipa"] or "",
+                "meaning": m["meaning"] or "",
                 "synonyms": synonyms,
-                "example": t.example or "",
-                "vietnamese_meaning": t.vietnamese_meaning or "",
+                "example": m["example"] or "",
+                "vietnamese_meaning": m["vietnamese_meaning"] or "",
             })
-        categories.append({"name": cat.name, "items": items})
 
     return {
         "id": row.id,
@@ -152,7 +176,7 @@ def _assemble_payload(conn: Session, row: VocabTable) -> dict[str, Any]:
         "study4_test_id": row.study4_test_id,
         "question_number": row.question_number,
         "topic": row.topic,
-        "categories": categories,
+        "categories": [{"name": c["name"], "items": c["items"]} for c in categories],
         "model": row.model,
         "created_at": row.created_at,
     }
@@ -166,20 +190,6 @@ def find_vocab_table_by_question_owned(
             VocabTable.user_id == user_id,
             VocabTable.study4_test_id == study4_test_id,
             VocabTable.question_number == question_number,
-        )
-    )
-    if row is None:
-        return None
-    return _assemble_payload(conn, row)
-
-
-def find_vocab_table_by_attempt_owned(
-    conn: Session, attempt_id: int, user_id: int
-) -> dict[str, Any] | None:
-    row = conn.scalar(
-        select(VocabTable).where(
-            VocabTable.attempt_id == attempt_id,
-            VocabTable.user_id == user_id,
         )
     )
     if row is None:

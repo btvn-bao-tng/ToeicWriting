@@ -40,7 +40,7 @@ async def create_mock_exam(
     request: MockExamCreate,
     user: dict[str, Any] = Depends(require_user_with_db),
     conn: Session = Depends(db_session),
-) -> dict[str, Any]:
+) -> MockExamResponse:
     payload = await run_in_threadpool(content_service.get_test_payload, request.study4_test_id)
     if payload is None:
         raise HTTPException(status_code=404, detail="Test not found")
@@ -186,78 +186,82 @@ async def submit_mock_exam(
         with db() as score_conn:
             drafts = mock_exams_repo.list_drafts(score_conn, mock_exam_id)
             draft_map = {d["question_number"]: d["body"] for d in drafts}
-            errors: list[dict[str, Any]] = []
 
-            yield ai_service.sse_event(
-                "start", {"mock_exam_id": mock_exam_id, "total_questions": total_questions}
-            )
+        errors: list[dict[str, Any]] = []
 
-            for question in visible:
-                number = question["question_number"]
-                answer = draft_map.get(number, "").strip()
-                max_score = MAX_SCORES.get(number, 3)
+        yield ai_service.sse_event(
+            "start", {"mock_exam_id": mock_exam_id, "total_questions": total_questions}
+        )
 
+        for question in visible:
+            number = question["question_number"]
+            answer = draft_map.get(number, "").strip()
+            max_score = MAX_SCORES.get(number, 3)
+
+            with db() as score_conn:
                 attempt_id = mock_exams_repo.insert_attempt(
                     score_conn, mock_exam_id, number, answer, "streaming", AI_MODEL
                 )
                 score_conn.commit()
 
-                yield ai_service.sse_event("question_start", {"question_number": number})
+            yield ai_service.sse_event("question_start", {"question_number": number})
 
-                if not answer:
-                    detail = "Answer is empty"
+            if not answer:
+                detail = "Answer is empty"
+                with db() as score_conn:
                     mock_exams_repo.mark_error(score_conn, attempt_id, detail, max_score)
                     score_conn.commit()
-                    errors.append({"question_number": number, "detail": detail})
-                    yield ai_service.sse_event(
-                        "question_error",
-                        {
-                            "question_number": number,
-                            "detail": detail,
-                            "converted_score": 0.0,
-                            "max_score": max_score,
-                        },
-                    )
-                    continue
+                errors.append({"question_number": number, "detail": detail})
+                yield ai_service.sse_event(
+                    "question_error",
+                    {
+                        "question_number": number,
+                        "detail": detail,
+                        "converted_score": 0.0,
+                        "max_score": max_score,
+                    },
+                )
+                continue
 
-                try:
-                    _part_order, _question_number, system_prompt, user_prompt = scoring_service.score_context(
-                        ScoreRequest(
-                            study4_test_id=study4_test_id,
-                            question_number=number,
-                            answer=answer,
+            try:
+                _part_order, _question_number, system_prompt, user_prompt = scoring_service.score_context(
+                    ScoreRequest(
+                        study4_test_id=study4_test_id,
+                        question_number=number,
+                        answer=answer,
+                    )
+                )
+
+                full_text = ""
+                for event in ai_service.ai_chat_stream(system_prompt, user_prompt):
+                    if "event: done" in event:
+                        continue
+                    if "event: error" in event:
+                        try:
+                            data_line = event.split("data:", 1)[1].strip()
+                            detail = json.loads(data_line).get("detail", "Scoring failed.")
+                        except (IndexError, json.JSONDecodeError):
+                            detail = "Scoring failed."
+                        raise RuntimeError(detail)
+                    if "event: delta" in event:
+                        try:
+                            data_line = event.split("data:", 1)[1].strip()
+                            delta = json.loads(data_line).get("content", "")
+                        except (IndexError, json.JSONDecodeError):
+                            delta = ""
+                        full_text += delta
+                        yield ai_service.sse_event(
+                            "delta", {"question_number": number, "content": delta}
                         )
-                    )
 
-                    full_text = ""
-                    for event in ai_service.ai_chat_stream(system_prompt, user_prompt):
-                        if "event: done" in event:
-                            continue
-                        if "event: error" in event:
-                            try:
-                                data_line = event.split("data:", 1)[1].strip()
-                                detail = json.loads(data_line).get("detail", "Scoring failed.")
-                            except (IndexError, json.JSONDecodeError):
-                                detail = "Scoring failed."
-                            raise RuntimeError(detail)
-                        if "event: delta" in event:
-                            try:
-                                data_line = event.split("data:", 1)[1].strip()
-                                delta = json.loads(data_line).get("content", "")
-                            except (IndexError, json.JSONDecodeError):
-                                delta = ""
-                            full_text += delta
-                            yield ai_service.sse_event(
-                                "delta", {"question_number": number, "content": delta}
-                            )
+                score_text = full_text
+                score_10 = parse_score_10(score_text)
+                converted_score: float | None = None
+                computed_max_score = max_score
+                if score_10 is not None:
+                    converted_score, computed_max_score = convert_score(number, score_10)
 
-                    score_text = full_text
-                    score_10 = parse_score_10(score_text)
-                    converted_score: float | None = None
-                    computed_max_score = max_score
-                    if score_10 is not None:
-                        converted_score, computed_max_score = convert_score(number, score_10)
-
+                with db() as score_conn:
                     mock_exams_repo.mark_visible(
                         score_conn,
                         attempt_id,
@@ -267,47 +271,49 @@ async def submit_mock_exam(
                         computed_max_score,
                     )
                     score_conn.commit()
-                    yield ai_service.sse_event(
-                        "question_done",
-                        {
-                            "question_number": number,
-                            "score_10": score_10,
-                            "converted_score": converted_score,
-                            "max_score": computed_max_score,
-                        },
-                    )
-                except Exception as exc:
-                    detail = str(exc)
+                yield ai_service.sse_event(
+                    "question_done",
+                    {
+                        "question_number": number,
+                        "score_10": score_10,
+                        "converted_score": converted_score,
+                        "max_score": computed_max_score,
+                    },
+                )
+            except Exception as exc:
+                detail = str(exc)
+                with db() as score_conn:
                     mock_exams_repo.mark_error(score_conn, attempt_id, detail, max_score)
                     score_conn.commit()
-                    errors.append({"question_number": number, "detail": detail})
-                    yield ai_service.sse_event(
-                        "question_error",
-                        {
-                            "question_number": number,
-                            "detail": detail,
-                            "converted_score": 0.0,
-                            "max_score": max_score,
-                        },
-                    )
+                errors.append({"question_number": number, "detail": detail})
+                yield ai_service.sse_event(
+                    "question_error",
+                    {
+                        "question_number": number,
+                        "detail": detail,
+                        "converted_score": 0.0,
+                        "max_score": max_score,
+                    },
+                )
 
+        with db() as score_conn:
             persisted_attempts = mock_exams_repo.list_attempts(score_conn, mock_exam_id)
             result = compute_mock_result(persisted_attempts)
             mock_exams_repo.complete_exam(
                 score_conn, mock_exam_id, result["raw_score"], result["scaled_score"]
             )
             score_conn.commit()
-
             exam_result = mock_exams_repo.get_exam(score_conn, user["id"], mock_exam_id)
-            yield ai_service.sse_event(
-                "complete",
-                {
-                    "exam": exam_result,
-                    "result": result,
-                    "errors": errors,
-                },
-            )
-            yield ai_service.sse_event("done", {})
+
+        yield ai_service.sse_event(
+            "complete",
+            {
+                "exam": exam_result,
+                "result": result,
+                "errors": errors,
+            },
+        )
+        yield ai_service.sse_event("done", {})
 
     return StreamingResponse(
         stream_score(),

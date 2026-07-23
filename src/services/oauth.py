@@ -39,6 +39,16 @@ def resolve_redirect_uri(request: Request) -> str:
     return f"{base}api/auth/google/callback"
 
 
+def warn_redirect_uri() -> str | None:
+    if google_oauth_enabled() and not GOOGLE_REDIRECT_URI:
+        return (
+            "GOOGLE_REDIRECT_URI is not set. The callback URL will be derived from "
+            "the request Host header, which is unreliable behind a reverse proxy. "
+            "Set GOOGLE_REDIRECT_URI explicitly in production."
+        )
+    return None
+
+
 def build_auth_url(state: str, redirect_uri: str) -> str:
     params = {
         "client_id": GOOGLE_CLIENT_ID,

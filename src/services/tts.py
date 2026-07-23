@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import logging
 from pathlib import Path
@@ -68,8 +67,3 @@ async def synthesize_async(text: str, accent: str | None = None) -> bytes:
     except OSError as error:
         logger.warning("Could not cache TTS audio: %s", error)
     return data
-
-
-def synthesize(text: str, accent: str | None = None) -> bytes:
-    """Sync wrapper for CLI/non-async use."""
-    return asyncio.run(synthesize_async(text, accent))

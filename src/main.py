@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -18,10 +19,28 @@ from .routers import score as score_router
 from .routers import tests as tests_router
 from .routers import tts as tts_router
 from .routers import vocab as vocab_router
+from .services import oauth as oauth_service
 
 logger = logging.getLogger("uvicorn.error")
 
-app = FastAPI(title="TOEIC SW Writing Browser")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info(
+        "Starting %s with %s database at %s",
+        app.title,
+        engine.dialect.name,
+        engine.url.render_as_string(hide_password=True),
+    )
+    await run_in_threadpool(init_db)
+    logger.info("Database schema is ready")
+    warning = oauth_service.warn_redirect_uri()
+    if warning:
+        logger.warning("%s", warning)
+    yield
+
+
+app = FastAPI(title="TOEIC SW Writing Browser", lifespan=lifespan)
 register_middleware(app)
 app.mount("/static", StaticFiles(directory=STATIC_PATH), name="static")
 
@@ -34,15 +53,3 @@ app.include_router(mock_exams_router.router)
 app.include_router(vocab_router.router)
 app.include_router(tts_router.router)
 app.include_router(revision_router.router)
-
-
-@app.on_event("startup")
-async def _startup() -> None:
-    logger.info(
-        "Starting %s with %s database at %s",
-        app.title,
-        engine.dialect.name,
-        engine.url.render_as_string(hide_password=True),
-    )
-    await run_in_threadpool(init_db)
-    logger.info("Database schema is ready")
