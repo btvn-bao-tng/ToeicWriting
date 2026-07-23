@@ -13,6 +13,7 @@ from .routers import auth as auth_router
 from .routers import mock_exams as mock_exams_router
 from .routers import pages as pages_router
 from .routers import progress as progress_router
+from .routers import revision as revision_router
 from .routers import score as score_router
 from .routers import tests as tests_router
 from .routers import tts as tts_router
@@ -32,6 +33,7 @@ app.include_router(score_router.router)
 app.include_router(mock_exams_router.router)
 app.include_router(vocab_router.router)
 app.include_router(tts_router.router)
+app.include_router(revision_router.router)
 
 
 @app.on_event("startup")

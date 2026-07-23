@@ -1,24 +1,38 @@
-window.TW.VocabTermCell = function VocabTermCell({ item }) {
+window.TW.VocabTermCell = function VocabTermCell({ item, saved = false, onToggleSave }) {
   const { speak } = window.TW;
   const image = item.image;
   const vn = item.vietnamese_meaning;
 
   return (
     <div className="flex flex-col overflow-hidden rounded-[10px] border border-hairline bg-white">
-      {image ? (
-        <div className="relative block w-full overflow-hidden bg-pearl">
+      <div className="relative block w-full overflow-hidden bg-pearl">
+        {image ? (
           <img
             src={image.url}
             alt={image.alt || item.term}
             loading="lazy"
             className="block h-auto w-full object-cover"
           />
-        </div>
-      ) : (
-        <div className="flex aspect-[3/2] w-full items-center justify-center bg-pearl text-ink-48">
-          <span className="text-[22px] leading-none">♫</span>
-        </div>
-      )}
+        ) : (
+          <div className="flex aspect-[3/2] w-full items-center justify-center bg-pearl text-ink-48">
+            <span className="text-[22px] leading-none">♫</span>
+          </div>
+        )}
+        {onToggleSave ? (
+          <button
+            type="button"
+            className={`absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full border text-[14px] font-semibold leading-none shadow-sm transition active:scale-95 ${
+              saved
+                ? "border-action bg-action text-white"
+                : "border-hairline bg-white/90 text-ink-48 backdrop-blur hover:bg-white hover:text-ink"
+            }`}
+            title={saved ? "Saved to revision" : "Add to revision"}
+            onClick={() => onToggleSave(item)}
+          >
+            {saved ? "✓" : "+"}
+          </button>
+        ) : null}
+      </div>
       <div className="flex flex-col gap-1.5 p-2.5">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
           <span className="text-[15px] font-semibold text-ink">{item.term}</span>
@@ -31,19 +45,19 @@ window.TW.VocabTermCell = function VocabTermCell({ item }) {
           <span className="ml-auto flex items-center gap-1">
             <button
               type="button"
-              className="flex h-6 w-6 items-center justify-center rounded-full border border-hairline bg-white text-[13px] leading-none text-ink-48 active:scale-95 hover:bg-parchment hover:text-ink"
+              className="flex h-6 min-w-6 items-center justify-center rounded-full border border-hairline bg-white px-1 text-[10px] font-semibold leading-none text-ink-48 active:scale-95 hover:bg-parchment hover:text-ink"
               title={`Hear "${item.term}" (US)`}
               onClick={() => speak(item.term, "us")}
             >
-              🇺🇸
+              US
             </button>
             <button
               type="button"
-              className="flex h-6 w-6 items-center justify-center rounded-full border border-hairline bg-white text-[13px] leading-none text-ink-48 active:scale-95 hover:bg-parchment hover:text-ink"
+              className="flex h-6 min-w-6 items-center justify-center rounded-full border border-hairline bg-white px-1 text-[10px] font-semibold leading-none text-ink-48 active:scale-95 hover:bg-parchment hover:text-ink"
               title={`Hear "${item.term}" (UK)`}
               onClick={() => speak(item.term, "uk")}
             >
-              🇬🇧
+              UK
             </button>
           </span>
         </div>
@@ -115,7 +129,7 @@ window.TW.QuestionPicture = function QuestionPicture({ question }) {
   );
 };
 
-window.TW.VocabModal = function VocabModal({ open, vocab, loading, error, onClose, onRegenerate, regenerating, question }) {
+window.TW.VocabModal = function VocabModal({ open, vocab, loading, error, onClose, onRegenerate, regenerating, question, savedKeys, onToggleSave }) {
   const { BTN_UTILITY: Btn } = window.TW.classes;
   const { VocabTermCell: TermCell, QuestionPicture, VocabGridSkeleton } = window.TW;
   const categories = vocab?.categories || [];
@@ -258,7 +272,12 @@ window.TW.VocabModal = function VocabModal({ open, vocab, loading, error, onClos
                     <h4 className="mb-2 text-[13px] font-semibold tracking-wide text-ink-48">{current.name}</h4>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                       {current.items.map((item, i) => (
-                        <TermCell key={i} item={item} />
+                        <TermCell
+                          key={i}
+                          item={item}
+                          saved={!!(savedKeys && savedKeys.has((item.term || "").toLowerCase()))}
+                          onToggleSave={onToggleSave}
+                        />
                       ))}
                     </div>
                   </>
@@ -276,14 +295,14 @@ window.TW.VocabModal = function VocabModal({ open, vocab, loading, error, onClos
         </div>
 
         <div className="border-t border-hairline bg-parchment px-4 py-2 text-[12px] text-ink-48">
-          Click 🇺🇸 or 🇬🇧 next to a word to hear it · use ‹ › or arrow keys to switch groups
+          Click US or UK next to a word to hear it · use ‹ › or arrow keys to switch groups
         </div>
       </div>
     </div>
   );
 };
 
-window.TW.VocabSection = function VocabSection({ question, allowScoring, attempt, open, onOpenChange }) {
+window.TW.VocabSection = function VocabSection({ question, allowScoring, attempt, open, onOpenChange, savedKeys, onToggleSave }) {
   const { generateVocab, getVocab, VocabModal } = window.TW;
 
   const enabled = !!allowScoring;
@@ -369,6 +388,8 @@ window.TW.VocabSection = function VocabSection({ question, allowScoring, attempt
       error={error}
       regenerating={loading}
       question={question}
+      savedKeys={savedKeys}
+      onToggleSave={onToggleSave}
       onClose={() => onOpenChange?.(false)}
       onRegenerate={handleGenerate}
     />

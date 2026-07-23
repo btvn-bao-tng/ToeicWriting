@@ -210,4 +210,39 @@ window.TW.getVocabDetail = async function getVocabDetail(term, topic, mainImageU
   });
 };
 
+window.TW.listRevision = async function listRevision() {
+  const data = await window.TW.apiJson("/api/revision");
+  return data.items || [];
+};
+
+window.TW.addRevision = async function addRevision(item) {
+  return window.TW.apiJson("/api/revision", {
+    method: "POST",
+    body: JSON.stringify({
+      term: item.term,
+      topic: item.topic || "",
+      image: item.image || null,
+      part_of_speech: item.part_of_speech || null,
+      ipa: item.ipa || null,
+      meaning: item.meaning || null,
+      example: item.example || null,
+      vietnamese_meaning: item.vietnamese_meaning || null,
+      synonyms: Array.isArray(item.synonyms) ? item.synonyms : null,
+    }),
+  });
+};
+
+window.TW.removeRevision = async function removeRevision(itemId) {
+  return window.TW.apiJson(`/api/revision/${encodeURIComponent(itemId)}`, {
+    method: "DELETE",
+  });
+};
+
+window.TW.setRevisionReviewed = async function setRevisionReviewed(itemId, reviewed) {
+  return window.TW.apiJson(`/api/revision/${encodeURIComponent(itemId)}/review`, {
+    method: "POST",
+    body: JSON.stringify({ reviewed: !!reviewed }),
+  });
+};
+
 window.TW.vocabCache = {};

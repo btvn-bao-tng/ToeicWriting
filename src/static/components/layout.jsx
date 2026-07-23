@@ -1,8 +1,30 @@
-window.TW.Header = function Header({ status, user, onLogout, onLogin }) {
+window.TW.Header = function Header({ status, user, onLogout, onLogin, activeView = "tests" }) {
+  const navItems = [
+    { key: "tests", label: "Tests", href: "#/tests" },
+    { key: "revision", label: "Revision", href: "#/revision" },
+    { key: "game", label: "Game", href: "#/game" },
+  ];
   return (
     <header className="sticky top-0 z-20 bg-black text-white">
       <div className="mx-auto flex min-h-[44px] max-w-5xl items-center justify-between gap-4 px-4">
-        <h1 className="text-[15px] font-semibold tracking-tight text-white">TOEIC SW Writing</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-[15px] font-semibold tracking-tight text-white">TOEIC SW Writing</h1>
+          <nav className="hidden items-center gap-1 sm:flex">
+            {navItems.map((item) => (
+              <a
+                key={item.key}
+                href={item.href}
+                className={`rounded-full px-3 py-1 text-[12px] font-medium transition ${
+                  activeView === item.key
+                    ? "bg-white/15 text-white"
+                    : "text-white/55 hover:text-white"
+                }`}
+              >
+                {item.label}
+              </a>
+            ))}
+          </nav>
+        </div>
         <div className="flex items-center gap-3 text-[12px] text-white/60">
           <span className="hidden font-medium text-white/50 sm:inline">{status}</span>
           {user ? (
@@ -27,6 +49,19 @@ window.TW.Header = function Header({ status, user, onLogout, onLogin }) {
           )}
         </div>
       </div>
+      <nav className="flex items-center gap-1 overflow-x-auto px-4 pb-2 sm:hidden">
+        {navItems.map((item) => (
+          <a
+            key={item.key}
+            href={item.href}
+            className={`shrink-0 rounded-full px-3 py-1 text-[12px] font-medium ${
+              activeView === item.key ? "bg-white/15 text-white" : "text-white/55"
+            }`}
+          >
+            {item.label}
+          </a>
+        ))}
+      </nav>
     </header>
   );
 };

@@ -62,3 +62,19 @@ class VocabDetailRequest(BaseModel):
     topic: str = Field(default="", max_length=80)
     main_image_url: str | None = None
     question_prompt: str = Field(default="", max_length=2000)
+
+
+class RevisionItemRequest(BaseModel):
+    term: str = Field(min_length=1, max_length=80)
+    topic: str = Field(default="", max_length=80)
+    image: dict | None = None
+    part_of_speech: str | None = None
+    ipa: str | None = None
+    meaning: str | None = None
+    example: str | None = None
+    vietnamese_meaning: str | None = None
+    synonyms: list[str] | None = None
+
+
+class ReviewStateRequest(BaseModel):
+    reviewed: bool = True

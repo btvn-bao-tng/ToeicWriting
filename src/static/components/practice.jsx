@@ -238,6 +238,8 @@ window.TW.QuestionCard = function QuestionCard({
   onActivate,
   saveLabel,
   onLogin,
+  revisionSavedKeys,
+  onToggleRevision,
 }) {
   const { AnswerBox, partForQuestion, partName, VocabSection } = window.TW;
   const { PILL_CLASS, CARD, LINK } = window.TW.classes;
@@ -295,6 +297,8 @@ window.TW.QuestionCard = function QuestionCard({
             attempt={latestAttempt}
             open={vocabOpen}
             onOpenChange={setVocabOpen}
+            savedKeys={revisionSavedKeys}
+            onToggleSave={onToggleRevision}
           />
         ) : null}
       </div>

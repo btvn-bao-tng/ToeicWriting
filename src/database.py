@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import (
     ForeignKey,
     Index,
+    Integer,
     String,
     Text,
     UniqueConstraint,
@@ -385,6 +386,37 @@ class VocabTerm(Base):
     synonyms: Mapped[str | None] = mapped_column(Text)
 
 
+class RevisionItem(Base):
+    __tablename__ = "revision_items"
+    __table_args__ = (
+        UniqueConstraint("user_id", "term"),
+        Index("idx_revision_items_user", "user_id", "id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    term: Mapped[str] = mapped_column(Text, nullable=False)
+    topic: Mapped[str] = mapped_column(
+        String, nullable=False, default="", server_default=""
+    )
+    image_url: Mapped[str | None] = mapped_column(Text)
+    image_page_url: Mapped[str | None] = mapped_column(Text)
+    image_photographer: Mapped[str | None] = mapped_column(Text)
+    image_alt: Mapped[str | None] = mapped_column(Text)
+    part_of_speech: Mapped[str | None] = mapped_column(Text)
+    ipa: Mapped[str | None] = mapped_column(Text)
+    meaning: Mapped[str | None] = mapped_column(Text)
+    example: Mapped[str | None] = mapped_column(Text)
+    vietnamese_meaning: Mapped[str | None] = mapped_column(Text)
+    synonyms: Mapped[str | None] = mapped_column(Text)
+    reviewed: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+
+
 def _existing_columns(conn: Session, table_name: str) -> set[str]:
     if IS_SQLITE:
         rows = conn.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
@@ -409,6 +441,9 @@ def _migrate() -> None:
             ("example", "TEXT"),
             ("vietnamese_meaning", "TEXT"),
             ("synonyms", "TEXT"),
+        ],
+        "revision_items": [
+            ("reviewed", "INTEGER NOT NULL DEFAULT 0"),
         ],
     }
     for table_name, columns in additions.items():
