@@ -4,14 +4,14 @@ import json
 from typing import Any
 
 from sqlalchemy import delete, select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import VocabCategory, VocabTable, VocabTerm
 from ..utils import now
 
 
-def upsert_vocab_table(
-    conn: Session,
+async def upsert_vocab_table(
+    conn: AsyncSession,
     user_id: int,
     study4_test_id: int,
     question_number: int,
@@ -21,7 +21,7 @@ def upsert_vocab_table(
     attempt_id: int | None = None,
 ) -> int:
     timestamp = now()
-    row = conn.scalar(
+    row = await conn.scalar(
         select(VocabTable).where(
             VocabTable.user_id == user_id,
             VocabTable.study4_test_id == study4_test_id,
@@ -48,11 +48,13 @@ def upsert_vocab_table(
         row.topic = topic
         row.model = model
         row.updated_at = timestamp
-    conn.flush()
+    await conn.flush()
     vocab_id = row.id
 
-    conn.execute(delete(VocabTerm).where(VocabTerm.vocab_table_id == vocab_id))
-    conn.execute(delete(VocabCategory).where(VocabCategory.vocab_table_id == vocab_id))
+    await conn.execute(delete(VocabTerm).where(VocabTerm.vocab_table_id == vocab_id))
+    await conn.execute(
+        delete(VocabCategory).where(VocabCategory.vocab_table_id == vocab_id)
+    )
 
     for cat_idx, category in enumerate(table_dict.get("categories") or []):
         if not isinstance(category, dict):
@@ -66,7 +68,7 @@ def upsert_vocab_table(
             sort_order=cat_idx,
         )
         conn.add(cat)
-        conn.flush()
+        await conn.flush()
         for term_idx, item in enumerate(category.get("items") or []):
             if not isinstance(item, dict):
                 continue
@@ -97,40 +99,42 @@ def upsert_vocab_table(
                     synonyms=synonyms_json,
                 )
             )
-    conn.flush()
+    await conn.flush()
     return vocab_id
 
 
-def _assemble_payload(conn: Session, row: VocabTable) -> dict[str, Any]:
-    rows = conn.execute(
-        select(
-            VocabCategory.id.label("cat_id"),
-            VocabCategory.name.label("cat_name"),
-            VocabCategory.sort_order.label("cat_sort"),
-            VocabTerm.id.label("term_id"),
-            VocabTerm.term,
-            VocabTerm.sort_order.label("term_sort"),
-            VocabTerm.image_url,
-            VocabTerm.image_page_url,
-            VocabTerm.image_photographer,
-            VocabTerm.image_alt,
-            VocabTerm.part_of_speech,
-            VocabTerm.ipa,
-            VocabTerm.meaning,
-            VocabTerm.example,
-            VocabTerm.vietnamese_meaning,
-            VocabTerm.synonyms,
-        )
-        .outerjoin(
-            VocabTerm,
-            VocabTerm.vocab_category_id == VocabCategory.id,
-        )
-        .where(VocabCategory.vocab_table_id == row.id)
-        .order_by(
-            VocabCategory.sort_order,
-            VocabCategory.id,
-            VocabTerm.sort_order,
-            VocabTerm.id,
+async def _assemble_payload(conn: AsyncSession, row: VocabTable) -> dict[str, Any]:
+    rows = (
+        await conn.execute(
+            select(
+                VocabCategory.id.label("cat_id"),
+                VocabCategory.name.label("cat_name"),
+                VocabCategory.sort_order.label("cat_sort"),
+                VocabTerm.id.label("term_id"),
+                VocabTerm.term,
+                VocabTerm.sort_order.label("term_sort"),
+                VocabTerm.image_url,
+                VocabTerm.image_page_url,
+                VocabTerm.image_photographer,
+                VocabTerm.image_alt,
+                VocabTerm.part_of_speech,
+                VocabTerm.ipa,
+                VocabTerm.meaning,
+                VocabTerm.example,
+                VocabTerm.vietnamese_meaning,
+                VocabTerm.synonyms,
+            )
+            .outerjoin(
+                VocabTerm,
+                VocabTerm.vocab_category_id == VocabCategory.id,
+            )
+            .where(VocabCategory.vocab_table_id == row.id)
+            .order_by(
+                VocabCategory.sort_order,
+                VocabCategory.id,
+                VocabTerm.sort_order,
+                VocabTerm.id,
+            )
         )
     ).all()
 
@@ -182,10 +186,10 @@ def _assemble_payload(conn: Session, row: VocabTable) -> dict[str, Any]:
     }
 
 
-def find_vocab_table_by_question_owned(
-    conn: Session, user_id: int, study4_test_id: int, question_number: int
+async def find_vocab_table_by_question_owned(
+    conn: AsyncSession, user_id: int, study4_test_id: int, question_number: int
 ) -> dict[str, Any] | None:
-    row = conn.scalar(
+    row = await conn.scalar(
         select(VocabTable).where(
             VocabTable.user_id == user_id,
             VocabTable.study4_test_id == study4_test_id,
@@ -194,4 +198,4 @@ def find_vocab_table_by_question_owned(
     )
     if row is None:
         return None
-    return _assemble_payload(conn, row)
+    return await _assemble_payload(conn, row)

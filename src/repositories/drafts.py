@@ -3,21 +3,21 @@ from __future__ import annotations
 from typing import Any
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import Draft
 from ..utils import now
 
 
-def upsert_draft(
-    conn: Session,
+async def upsert_draft(
+    conn: AsyncSession,
     user_id: int,
     study4_test_id: int,
     question_number: int,
     body: str,
 ) -> None:
     timestamp = now()
-    draft = conn.scalar(
+    draft = await conn.scalar(
         select(Draft).where(
             Draft.user_id == user_id,
             Draft.study4_test_id == study4_test_id,
@@ -39,25 +39,27 @@ def upsert_draft(
     draft.updated_at = timestamp
 
 
-def list_drafts(
-    conn: Session, user_id: int, study4_test_id: int
+async def list_drafts(
+    conn: AsyncSession, user_id: int, study4_test_id: int
 ) -> list[dict[str, Any]]:
-    rows = conn.execute(
-        select(Draft.question_number, Draft.body).where(
-            Draft.user_id == user_id,
-            Draft.study4_test_id == study4_test_id,
+    rows = (
+        await conn.execute(
+            select(Draft.question_number, Draft.body).where(
+                Draft.user_id == user_id,
+                Draft.study4_test_id == study4_test_id,
+            )
         )
     ).all()
     return [dict(row._mapping) for row in rows]
 
 
-def delete_draft(
-    conn: Session,
+async def delete_draft(
+    conn: AsyncSession,
     user_id: int,
     study4_test_id: int,
     question_number: int,
 ) -> None:
-    draft = conn.scalar(
+    draft = await conn.scalar(
         select(Draft).where(
             Draft.user_id == user_id,
             Draft.study4_test_id == study4_test_id,
@@ -65,4 +67,4 @@ def delete_draft(
         )
     )
     if draft is not None:
-        conn.delete(draft)
+        await conn.delete(draft)

@@ -5,7 +5,6 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from starlette.concurrency import run_in_threadpool
 
 from .config import STATIC_PATH
 from .database import engine, init_db
@@ -32,7 +31,7 @@ async def lifespan(app: FastAPI):
         engine.dialect.name,
         engine.url.render_as_string(hide_password=True),
     )
-    await run_in_threadpool(init_db)
+    await init_db()
     logger.info("Database schema is ready")
     warning = oauth_service.warn_redirect_uri()
     if warning:

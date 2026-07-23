@@ -3,14 +3,14 @@ from __future__ import annotations
 from typing import Any
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import MockExam, MockExamAttempt, MockExamDraft
 from ..utils import now
 
 
-def insert_exam(
-    conn: Session,
+async def insert_exam(
+    conn: AsyncSession,
     user_id: int,
     study4_test_id: int,
     selected_part: str,
@@ -25,64 +25,68 @@ def insert_exam(
         updated_at=timestamp,
     )
     conn.add(exam)
-    conn.flush()
+    await conn.flush()
     return exam.id
 
 
-def get_exam(
-    conn: Session,
+async def get_exam(
+    conn: AsyncSession,
     user_id: int,
     mock_exam_id: int,
 ) -> dict[str, Any] | None:
-    row = conn.execute(
-        select(
-            MockExam.id,
-            MockExam.user_id,
-            MockExam.study4_test_id,
-            MockExam.selected_part,
-            MockExam.status,
-            MockExam.raw_score,
-            MockExam.scaled_score,
-            MockExam.created_at,
-            MockExam.updated_at,
-            MockExam.completed_at,
-        ).where(
-            MockExam.id == mock_exam_id,
-            MockExam.user_id == user_id,
+    row = (
+        await conn.execute(
+            select(
+                MockExam.id,
+                MockExam.user_id,
+                MockExam.study4_test_id,
+                MockExam.selected_part,
+                MockExam.status,
+                MockExam.raw_score,
+                MockExam.scaled_score,
+                MockExam.created_at,
+                MockExam.updated_at,
+                MockExam.completed_at,
+            ).where(
+                MockExam.id == mock_exam_id,
+                MockExam.user_id == user_id,
+            )
         )
     ).first()
     return dict(row._mapping) if row else None
 
 
-def list_exams(
-    conn: Session,
+async def list_exams(
+    conn: AsyncSession,
     user_id: int,
 ) -> list[dict[str, Any]]:
-    rows = conn.execute(
-        select(
-            MockExam.id,
-            MockExam.study4_test_id,
-            MockExam.selected_part,
-            MockExam.status,
-            MockExam.raw_score,
-            MockExam.scaled_score,
-            MockExam.created_at,
-            MockExam.completed_at,
+    rows = (
+        await conn.execute(
+            select(
+                MockExam.id,
+                MockExam.study4_test_id,
+                MockExam.selected_part,
+                MockExam.status,
+                MockExam.raw_score,
+                MockExam.scaled_score,
+                MockExam.created_at,
+                MockExam.completed_at,
+            )
+            .where(MockExam.user_id == user_id)
+            .order_by(MockExam.created_at.desc())
         )
-        .where(MockExam.user_id == user_id)
-        .order_by(MockExam.created_at.desc())
     ).all()
     return [dict(row._mapping) for row in rows]
 
 
-def complete_exam(
-    conn: Session,
+async def complete_exam(
+    conn: AsyncSession,
     mock_exam_id: int,
     raw_score: float,
     scaled_score: int,
 ) -> None:
     timestamp = now()
-    exam = conn.get(MockExam, mock_exam_id)
+    exam = await conn.get(MockExam, mock_exam_id)
     if exam is None:
         return
     exam.status = "completed"
@@ -92,14 +96,14 @@ def complete_exam(
     exam.updated_at = timestamp
 
 
-def upsert_draft(
-    conn: Session,
+async def upsert_draft(
+    conn: AsyncSession,
     mock_exam_id: int,
     question_number: int,
     body: str,
 ) -> None:
     timestamp = now()
-    draft = conn.scalar(
+    draft = await conn.scalar(
         select(MockExamDraft).where(
             MockExamDraft.mock_exam_id == mock_exam_id,
             MockExamDraft.question_number == question_number,
@@ -119,23 +123,25 @@ def upsert_draft(
     draft.updated_at = timestamp
 
 
-def list_drafts(
-    conn: Session,
+async def list_drafts(
+    conn: AsyncSession,
     mock_exam_id: int,
 ) -> list[dict[str, Any]]:
-    rows = conn.execute(
-        select(
-            MockExamDraft.question_number,
-            MockExamDraft.body,
+    rows = (
+        await conn.execute(
+            select(
+                MockExamDraft.question_number,
+                MockExamDraft.body,
+            )
+            .where(MockExamDraft.mock_exam_id == mock_exam_id)
+            .order_by(MockExamDraft.question_number)
         )
-        .where(MockExamDraft.mock_exam_id == mock_exam_id)
-        .order_by(MockExamDraft.question_number)
     ).all()
     return [dict(row._mapping) for row in rows]
 
 
-def insert_attempt(
-    conn: Session,
+async def insert_attempt(
+    conn: AsyncSession,
     mock_exam_id: int,
     question_number: int,
     answer: str,
@@ -154,19 +160,19 @@ def insert_attempt(
         updated_at=timestamp,
     )
     conn.add(attempt)
-    conn.flush()
+    await conn.flush()
     return attempt.id
 
 
-def mark_visible(
-    conn: Session,
+async def mark_visible(
+    conn: AsyncSession,
     attempt_id: int,
     score_text: str,
     score_10: float | None,
     converted_score: float | None,
     max_score: int | None,
 ) -> None:
-    attempt = conn.get(MockExamAttempt, attempt_id)
+    attempt = await conn.get(MockExamAttempt, attempt_id)
     if attempt is None:
         return
     attempt.score_text = score_text
@@ -177,13 +183,13 @@ def mark_visible(
     attempt.updated_at = now()
 
 
-def mark_error(
-    conn: Session,
+async def mark_error(
+    conn: AsyncSession,
     attempt_id: int,
     detail: str,
     max_score: int | None = None,
 ) -> None:
-    attempt = conn.get(MockExamAttempt, attempt_id)
+    attempt = await conn.get(MockExamAttempt, attempt_id)
     if attempt is None:
         return
     attempt.score_state = "error"
@@ -194,8 +200,8 @@ def mark_error(
     attempt.updated_at = now()
 
 
-def list_attempts(
-    conn: Session,
+async def list_attempts(
+    conn: AsyncSession,
     mock_exam_id: int,
 ) -> list[dict[str, Any]]:
     latest_ids = (
@@ -204,33 +210,37 @@ def list_attempts(
         .group_by(MockExamAttempt.question_number)
     ).subquery()
 
-    rows = conn.execute(
-        select(
-            MockExamAttempt.id,
-            MockExamAttempt.question_number,
-            MockExamAttempt.answer,
-            MockExamAttempt.score_text,
-            MockExamAttempt.score_state,
-            MockExamAttempt.score_10,
-            MockExamAttempt.converted_score,
-            MockExamAttempt.max_score,
-            MockExamAttempt.model,
-            MockExamAttempt.created_at,
+    rows = (
+        await conn.execute(
+            select(
+                MockExamAttempt.id,
+                MockExamAttempt.question_number,
+                MockExamAttempt.answer,
+                MockExamAttempt.score_text,
+                MockExamAttempt.score_state,
+                MockExamAttempt.score_10,
+                MockExamAttempt.converted_score,
+                MockExamAttempt.max_score,
+                MockExamAttempt.model,
+                MockExamAttempt.created_at,
+            )
+            .join(latest_ids, MockExamAttempt.id == latest_ids.c.id)
+            .order_by(MockExamAttempt.question_number)
         )
-        .join(latest_ids, MockExamAttempt.id == latest_ids.c.id)
-        .order_by(MockExamAttempt.question_number)
     ).all()
     return [dict(row._mapping) for row in rows]
 
 
-def normalize_streaming(conn: Session, mock_exam_id: int) -> None:
+async def normalize_streaming(conn: AsyncSession, mock_exam_id: int) -> None:
     from ..services.mock_scoring import MAX_SCORES
 
-    rows = conn.scalars(
-        select(MockExamAttempt).where(
-            MockExamAttempt.mock_exam_id == mock_exam_id,
-            MockExamAttempt.score_state == "streaming",
-            MockExamAttempt.score_text == "",
+    rows = (
+        await conn.scalars(
+            select(MockExamAttempt).where(
+                MockExamAttempt.mock_exam_id == mock_exam_id,
+                MockExamAttempt.score_state == "streaming",
+                MockExamAttempt.score_text == "",
+            )
         )
     ).all()
     timestamp = now()

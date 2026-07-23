@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import json
 import secrets
-import urllib.error
 import urllib.parse
-import urllib.request
 from typing import Any
 
+import httpx
 from fastapi import HTTPException, Request
-from starlette.concurrency import run_in_threadpool
 
 from ..config import (
     GOOGLE_CLIENT_ID,
@@ -61,41 +59,55 @@ def build_auth_url(state: str, redirect_uri: str) -> str:
     return f"{GOOGLE_AUTH_URL}?{urllib.parse.urlencode(params)}"
 
 
-def _post_form(url: str, data: dict[str, str]) -> dict[str, Any]:
-    body = urllib.parse.urlencode(data).encode("utf-8")
-    req = urllib.request.Request(url, data=body, method="POST")
-    req.add_header("Content-Type", "application/x-www-form-urlencoded")
-    req.add_header("Accept", "application/json")
+async def _post_form(url: str, data: dict[str, str]) -> dict[str, Any]:
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", "replace")
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.post(
+                url,
+                data=data,
+                headers={"Accept": "application/json"},
+            )
+    except httpx.HTTPError as exc:
         raise HTTPException(
-            status_code=502, detail=f"Google token exchange failed: {detail}"
-        )
-    except urllib.error.URLError as exc:
+            status_code=502, detail=f"Google token exchange failed: {exc}"
+        ) from exc
+
+    if response.status_code >= 400:
         raise HTTPException(
-            status_code=502, detail=f"Google token exchange failed: {exc.reason}"
+            status_code=502,
+            detail=f"Google token exchange failed: {response.text}",
         )
+    try:
+        return response.json()
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=502, detail=f"Google token exchange failed: {exc}"
+        ) from exc
 
 
-def _get_json(url: str, bearer: str) -> dict[str, Any]:
-    req = urllib.request.Request(url, method="GET")
-    req.add_header("Authorization", f"Bearer {bearer}")
-    req.add_header("Accept", "application/json")
+async def _get_json(url: str, bearer: str) -> dict[str, Any]:
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", "replace")
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.get(
+                url,
+                headers={"Authorization": f"Bearer {bearer}", "Accept": "application/json"},
+            )
+    except httpx.HTTPError as exc:
         raise HTTPException(
-            status_code=502, detail=f"Google userinfo request failed: {detail}"
-        )
-    except urllib.error.URLError as exc:
+            status_code=502, detail=f"Google userinfo request failed: {exc}"
+        ) from exc
+
+    if response.status_code >= 400:
         raise HTTPException(
-            status_code=502, detail=f"Google userinfo request failed: {exc.reason}"
+            status_code=502,
+            detail=f"Google userinfo request failed: {response.text}",
         )
+    try:
+        return response.json()
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=502, detail=f"Google userinfo request failed: {exc}"
+        ) from exc
 
 
 async def exchange_code(code: str, redirect_uri: str) -> dict[str, Any]:
@@ -106,8 +118,8 @@ async def exchange_code(code: str, redirect_uri: str) -> dict[str, Any]:
         "redirect_uri": redirect_uri,
         "grant_type": "authorization_code",
     }
-    return await run_in_threadpool(_post_form, GOOGLE_TOKEN_URL, data)
+    return await _post_form(GOOGLE_TOKEN_URL, data)
 
 
 async def fetch_userinfo(access_token: str) -> dict[str, Any]:
-    return await run_in_threadpool(_get_json, GOOGLE_USERINFO_URL, access_token)
+    return await _get_json(GOOGLE_USERINFO_URL, access_token)

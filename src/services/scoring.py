@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import base64
 import mimetypes
-import urllib.error
-import urllib.request
 from functools import lru_cache
 from typing import Any
 
+import httpx
 from fastapi import HTTPException
 
 from ..config import MAX_IMAGE_ATTACHMENTS, MAX_IMAGE_BYTES, SYSTEM_PROMPT_DIR
@@ -44,33 +43,33 @@ def guess_image_mime(url: str, content_type: str | None) -> str:
     return mime if mime and mime.startswith("image/") else "image/png"
 
 
-def fetch_image_as_data_url(url: str) -> tuple[str | None, str | None]:
+async def fetch_image_as_data_url(url: str) -> tuple[str | None, str | None]:
     if not is_safe_fetch_url(url):
         return None, f"{url} was blocked by SSRF protection"
 
-    request = urllib.request.Request(
-        url,
-        headers={
-            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-            "User-Agent": "Mozilla/5.0 TOEICWriting/1.0",
-        },
-        method="GET",
-    )
+    headers = {
+        "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        "User-Agent": "Mozilla/5.0 TOEICWriting/1.0",
+    }
 
     try:
-        with urllib.request.urlopen(request, timeout=20) as response:
-            content_type = response.headers.get("Content-Type")
-            content_length = response.headers.get("Content-Length")
-            try:
-                if content_length and int(content_length) > MAX_IMAGE_BYTES:
-                    return None, f"{url} was larger than {MAX_IMAGE_BYTES} bytes"
-            except ValueError:
-                pass
-
-            image_bytes = response.read(MAX_IMAGE_BYTES + 1)
-    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as exc:
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+            response = await client.get(url, headers=headers)
+    except (httpx.HTTPError, OSError) as exc:
         return None, f"{url} could not be fetched: {exc}"
 
+    if response.status_code >= 400:
+        return None, f"{url} could not be fetched: HTTP {response.status_code}"
+
+    content_type = response.headers.get("Content-Type")
+    content_length = response.headers.get("Content-Length")
+    try:
+        if content_length and int(content_length) > MAX_IMAGE_BYTES:
+            return None, f"{url} was larger than {MAX_IMAGE_BYTES} bytes"
+    except ValueError:
+        pass
+
+    image_bytes = response.content
     if len(image_bytes) > MAX_IMAGE_BYTES:
         return None, f"{url} was larger than {MAX_IMAGE_BYTES} bytes"
     if not image_bytes:
@@ -81,12 +80,12 @@ def fetch_image_as_data_url(url: str) -> tuple[str | None, str | None]:
     return f"data:{mime};base64,{encoded}", None
 
 
-def build_user_content(prompt_text: str, asset_urls: list[str]) -> list[dict[str, Any]]:
+async def build_user_content(prompt_text: str, asset_urls: list[str]) -> list[dict[str, Any]]:
     content: list[dict[str, Any]] = [{"type": "text", "text": prompt_text}]
     failures = []
 
     for index, url in enumerate(asset_urls[:MAX_IMAGE_ATTACHMENTS], start=1):
-        data_url, error = fetch_image_as_data_url(url)
+        data_url, error = await fetch_image_as_data_url(url)
         if error:
             failures.append(error)
             continue
@@ -117,12 +116,12 @@ def build_user_content(prompt_text: str, asset_urls: list[str]) -> list[dict[str
     return content
 
 
-def score_context(request: ScoreRequest) -> tuple[int, int, str, Any]:
+async def score_context(request: ScoreRequest) -> tuple[int, int, str, Any]:
     answer = request.answer.strip()
     if not answer:
         raise HTTPException(status_code=400, detail="Answer is empty")
 
-    row = content_service.find_question(request.study4_test_id, request.question_number)
+    row = await content_service.find_question(request.study4_test_id, request.question_number)
 
     if row is None:
         raise HTTPException(status_code=404, detail="Question not found")
@@ -145,5 +144,5 @@ def score_context(request: ScoreRequest) -> tuple[int, int, str, Any]:
         part_order,
         int(row["question_number"]),
         system_prompt_for_part(part_order),
-        build_user_content(user_prompt, assets),
+        await build_user_content(user_prompt, assets),
     )

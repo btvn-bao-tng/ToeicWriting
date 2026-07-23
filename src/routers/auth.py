@@ -6,7 +6,6 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.exc import IntegrityError
-from starlette.concurrency import run_in_threadpool
 
 from ..database import db
 from ..deps import clear_user_cache, current_user, remember_user
@@ -106,32 +105,28 @@ async def google_callback(request: Request) -> RedirectResponse:
             status_code=400, detail="Your Google email is not verified."
         )
 
-    def _save_user() -> dict[str, Any] | None:
-        user: dict[str, Any] | None = None
-        with db() as conn:
-            user = users_repo.find_user_by_google_id(conn, google_id)
-            if user:
-                if user.get("email") != email:
-                    users_repo.update_user_email(conn, user["id"], email)
+    user: dict[str, Any] | None = None
+    async with db() as conn:
+        user = await users_repo.find_user_by_google_id(conn, google_id)
+        if user:
+            if user.get("email") != email:
+                await users_repo.update_user_email(conn, user["id"], email)
+        else:
+            existing = await users_repo.find_user_by_email(conn, email)
+            if existing:
+                await users_repo.link_google_id(conn, existing["id"], google_id)
+                user = existing
             else:
-                existing = users_repo.find_user_by_email(conn, email)
-                if existing:
-                    users_repo.link_google_id(conn, existing["id"], google_id)
-                    user = existing
-                else:
-                    try:
-                        uid = users_repo.insert_google_user(conn, google_id, email, email)
-                        conn.commit()
-                        user = users_repo.find_user_by_id(conn, uid)
-                    except IntegrityError:
-                        conn.rollback()
-                        raise HTTPException(
-                            status_code=409,
-                            detail="Could not create an account from this Google login.",
-                        )
-        return user
-
-    user = await run_in_threadpool(_save_user)
+                try:
+                    uid = await users_repo.insert_google_user(conn, google_id, email, email)
+                    await conn.commit()
+                    user = await users_repo.find_user_by_id(conn, uid)
+                except IntegrityError:
+                    await conn.rollback()
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Could not create an account from this Google login.",
+                    )
 
     if not user:
         raise HTTPException(status_code=500, detail="Google login failed.")

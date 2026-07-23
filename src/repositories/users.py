@@ -4,7 +4,7 @@ import re
 from typing import Any
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import User
 from ..utils import now
@@ -25,29 +25,29 @@ def _sanitize_google_username(email: str) -> str:
     return base
 
 
-def _ensure_unique_username(conn: Session, username: str) -> str:
+async def _ensure_unique_username(conn: AsyncSession, username: str) -> str:
     candidate = username
     suffix = 1
-    while conn.scalar(select(User).where(User.username == candidate)) is not None:
+    while await conn.scalar(select(User).where(User.username == candidate)) is not None:
         trimmed = username[: _USERNAME_MAX - len(str(suffix))]
         candidate = f"{trimmed}{suffix}"
         suffix += 1
     return candidate
 
 
-def insert_user(
-    conn: Session, username: str, password_hash: str
+async def insert_user(
+    conn: AsyncSession, username: str, password_hash: str
 ) -> int:
     user = User(username=username, password_hash=password_hash, created_at=now())
     conn.add(user)
-    conn.flush()
+    await conn.flush()
     return user.id
 
 
-def find_user_by_username(
-    conn: Session, username: str
+async def find_user_by_username(
+    conn: AsyncSession, username: str
 ) -> dict[str, Any] | None:
-    user = conn.scalar(select(User).where(User.username == username))
+    user = await conn.scalar(select(User).where(User.username == username))
     if user is None:
         return None
     return {
@@ -58,19 +58,19 @@ def find_user_by_username(
     }
 
 
-def find_user_by_id(
-    conn: Session, user_id: int
+async def find_user_by_id(
+    conn: AsyncSession, user_id: int
 ) -> dict[str, Any] | None:
-    user = conn.get(User, user_id)
+    user = await conn.get(User, user_id)
     if user is None:
         return None
     return {"id": user.id, "username": user.username, "created_at": user.created_at}
 
 
-def find_user_by_google_id(
-    conn: Session, google_id: str
+async def find_user_by_google_id(
+    conn: AsyncSession, google_id: str
 ) -> dict[str, Any] | None:
-    user = conn.scalar(select(User).where(User.google_id == google_id))
+    user = await conn.scalar(select(User).where(User.google_id == google_id))
     if user is None:
         return None
     return {
@@ -82,10 +82,10 @@ def find_user_by_google_id(
     }
 
 
-def find_user_by_email(
-    conn: Session, email: str
+async def find_user_by_email(
+    conn: AsyncSession, email: str
 ) -> dict[str, Any] | None:
-    user = conn.scalar(select(User).where(User.email == email))
+    user = await conn.scalar(select(User).where(User.email == email))
     if user is None:
         return None
     return {
@@ -97,10 +97,10 @@ def find_user_by_email(
     }
 
 
-def insert_google_user(
-    conn: Session, google_id: str, email: str, _username: str
+async def insert_google_user(
+    conn: AsyncSession, google_id: str, email: str, _username: str
 ) -> int:
-    username = _ensure_unique_username(conn, _sanitize_google_username(email))
+    username = await _ensure_unique_username(conn, _sanitize_google_username(email))
     user = User(
         username=username,
         password_hash="",
@@ -109,19 +109,19 @@ def insert_google_user(
         created_at=now(),
     )
     conn.add(user)
-    conn.flush()
+    await conn.flush()
     return user.id
 
 
-def update_user_email(conn: Session, user_id: int, email: str) -> None:
-    user = conn.get(User, user_id)
+async def update_user_email(conn: AsyncSession, user_id: int, email: str) -> None:
+    user = await conn.get(User, user_id)
     if user is None:
         return
     user.email = email
 
 
-def link_google_id(conn: Session, user_id: int, google_id: str) -> None:
-    user = conn.get(User, user_id)
+async def link_google_id(conn: AsyncSession, user_id: int, google_id: str) -> None:
+    user = await conn.get(User, user_id)
     if user is None:
         return
     user.google_id = google_id

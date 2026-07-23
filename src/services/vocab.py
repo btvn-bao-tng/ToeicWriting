@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import json
 import re
-from functools import lru_cache
 from typing import Any
 
 from fastapi import HTTPException
-from starlette.concurrency import run_in_threadpool
 
 from ..config import MAX_IMAGE_ATTACHMENTS, SYSTEM_PROMPT_DIR
 from ..utils import decode_assets
@@ -42,7 +40,7 @@ def _strip_html(html: str | None) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def build_vocab_user_content(
+async def build_vocab_user_content(
     question_row: dict[str, Any],
     answer: str,
     score_text: str,
@@ -67,7 +65,7 @@ def build_vocab_user_content(
 
     failures: list[str] = []
     for index, url in enumerate(assets[:MAX_IMAGE_ATTACHMENTS], start=1):
-        data_url, error = fetch_image_as_data_url(url)
+        data_url, error = await fetch_image_as_data_url(url)
         if error:
             failures.append(error)
             continue
@@ -193,9 +191,7 @@ async def generate_table(
     answer: str,
     score_text: str,
 ) -> dict[str, Any]:
-    user_content = await run_in_threadpool(
-        build_vocab_user_content, question_row, answer, score_text
-    )
+    user_content = await build_vocab_user_content(question_row, answer, score_text)
     raw_text = await ai_service.ai_chat(_system_prompt(), user_content)
     try:
         raw = _extract_json(raw_text)
@@ -203,8 +199,8 @@ async def generate_table(
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=f"Could not parse vocab table: {exc}") from exc
 
-    categories_with_images = await run_in_threadpool(
-        image_service.attach_images, table["categories"], table["topic"]
+    categories_with_images = await image_service.attach_images(
+        table["categories"], table["topic"]
     )
     return {"topic": table["topic"], "categories": categories_with_images}
 
@@ -228,8 +224,14 @@ def _as_str_list(value: Any) -> list[str]:
     return [str(item).strip() for item in value if str(item).strip()]
 
 
-@lru_cache(maxsize=1024)
-def _cached_term_explanation(term: str, topic: str, question_prompt: str) -> dict[str, Any]:
+_term_detail_cache: dict[tuple[str, str, str], dict[str, Any]] = {}
+
+
+async def _term_explanation(term: str, topic: str, question_prompt: str) -> dict[str, Any]:
+    key = (term, topic, question_prompt)
+    if key in _term_detail_cache:
+        return _term_detail_cache[key]
+
     user_text = f"Term: {term}"
     if topic:
         user_text += f"\nScene / topic context: {topic}"
@@ -239,7 +241,7 @@ def _cached_term_explanation(term: str, topic: str, question_prompt: str) -> dic
             + question_prompt
         )
     user_text += "\n\nReturn the study-card JSON for this term only."
-    raw_text = ai_service._ai_chat_sync(
+    raw_text = await ai_service.ai_chat(
         _detail_system_prompt(), [{"type": "text", "text": user_text}]
     )
     try:
@@ -249,7 +251,7 @@ def _cached_term_explanation(term: str, topic: str, question_prompt: str) -> dic
             status_code=502, detail=f"Could not parse vocab detail: {exc}"
         ) from exc
 
-    return {
+    detail = {
         "term": term,
         "part_of_speech": str(raw.get("part_of_speech") or "").strip(),
         "ipa": str(raw.get("ipa") or "").strip(),
@@ -259,6 +261,8 @@ def _cached_term_explanation(term: str, topic: str, question_prompt: str) -> dic
         "synonyms": _as_str_list(raw.get("synonyms")),
         "collocations": _as_str_list(raw.get("collocations")),
     }
+    _term_detail_cache[key] = detail
+    return detail
 
 
 async def generate_term_detail(
@@ -271,16 +275,13 @@ async def generate_term_detail(
     if not clean_term:
         raise HTTPException(status_code=400, detail="term is required")
 
-    detail = await run_in_threadpool(
-        _cached_term_explanation, clean_term, topic, (question_prompt or "").strip()
-    )
+    detail = await _term_explanation(clean_term, topic, (question_prompt or "").strip())
     primary_query = clean_term
-    extras = await run_in_threadpool(
-        image_service.search_extra_images, primary_query, exclude_url=main_image_url, count=2
+    extras = await image_service.search_extra_images(
+        primary_query, exclude_url=main_image_url, count=2
     )
     if not extras and topic:
-        extras = await run_in_threadpool(
-            image_service.search_extra_images,
+        extras = await image_service.search_extra_images(
             f"{topic} {clean_term}",
             exclude_url=main_image_url,
             count=2,

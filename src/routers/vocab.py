@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from starlette.concurrency import run_in_threadpool
 
 from ..config import AI_MODEL, PEXELS_API_KEY
 from ..database import db
@@ -28,8 +27,8 @@ async def generate_vocab(
             detail="PEXELS_API_KEY is not set. Configure it to generate vocab images.",
         )
 
-    question_row = await run_in_threadpool(
-        content_service.find_question, request.study4_test_id, request.question_number
+    question_row = await content_service.find_question(
+        request.study4_test_id, request.question_number
     )
     if question_row is None:
         raise HTTPException(status_code=404, detail="Question not found")
@@ -38,11 +37,8 @@ async def generate_vocab(
     score_text = ""
     attempt_id = request.attempt_id
     if attempt_id is not None:
-        def _load_attempt() -> dict[str, Any] | None:
-            with db() as conn:
-                return attempts_repo.find_attempt(conn, attempt_id)
-
-        attempt = await run_in_threadpool(_load_attempt)
+        async with db() as conn:
+            attempt = await attempts_repo.find_attempt(conn, attempt_id)
         if attempt is None:
             raise HTTPException(status_code=404, detail="Attempt not found")
         if attempt["user_id"] != user["id"]:
@@ -59,25 +55,21 @@ async def generate_vocab(
 
     table = await vocab_service.generate_table(question_row, answer, score_text)
 
-    def _save() -> dict[str, Any] | None:
-        with db() as conn:
-            vocab_repo.upsert_vocab_table(
-                conn,
-                user["id"],
-                request.study4_test_id,
-                request.question_number,
-                table["topic"],
-                table,
-                AI_MODEL,
-                attempt_id,
-            )
-            payload = vocab_repo.find_vocab_table_by_question_owned(
-                conn, user["id"], request.study4_test_id, request.question_number
-            )
-            conn.commit()
-        return payload
-
-    payload = await run_in_threadpool(_save)
+    async with db() as conn:
+        await vocab_repo.upsert_vocab_table(
+            conn,
+            user["id"],
+            request.study4_test_id,
+            request.question_number,
+            table["topic"],
+            table,
+            AI_MODEL,
+            attempt_id,
+        )
+        payload = await vocab_repo.find_vocab_table_by_question_owned(
+            conn, user["id"], request.study4_test_id, request.question_number
+        )
+        await conn.commit()
 
     return payload
 
@@ -88,13 +80,10 @@ async def get_vocab(
     question_number: int,
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
-    def _load() -> dict[str, Any] | None:
-        with db() as conn:
-            return vocab_repo.find_vocab_table_by_question_owned(
-                conn, user["id"], study4_test_id, question_number
-            )
-
-    payload = await run_in_threadpool(_load)
+    async with db() as conn:
+        payload = await vocab_repo.find_vocab_table_by_question_owned(
+            conn, user["id"], study4_test_id, question_number
+        )
     if payload is None:
         raise HTTPException(status_code=404, detail="No saved vocab table for this question")
     return payload

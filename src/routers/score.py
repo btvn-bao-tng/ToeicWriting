@@ -5,7 +5,6 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from starlette.concurrency import run_in_threadpool
 
 from ..config import AI_API_KEY, AI_MODEL
 from ..database import db
@@ -23,27 +22,23 @@ async def score_answer(
     request: ScoreRequest,
     user: dict[str, Any] = Depends(require_user),
 ) -> ScoreResponse:
-    part_order, question_number, system_prompt, user_prompt = await run_in_threadpool(
-        scoring_service.score_context, request
+    part_order, question_number, system_prompt, user_prompt = await scoring_service.score_context(
+        request
     )
     score_text = await ai_service.ai_chat(system_prompt, user_prompt)
 
-    def _save() -> int:
-        with db() as conn:
-            attempt_id = attempts_repo.insert_attempt(
-                conn,
-                user["id"],
-                request.study4_test_id,
-                request.question_number,
-                request.answer,
-                score_text,
-                "visible",
-                AI_MODEL,
-            )
-            conn.commit()
-        return attempt_id
-
-    attempt_id = await run_in_threadpool(_save)
+    async with db() as conn:
+        attempt_id = await attempts_repo.insert_attempt(
+            conn,
+            user["id"],
+            request.study4_test_id,
+            request.question_number,
+            request.answer,
+            score_text,
+            "visible",
+            AI_MODEL,
+        )
+        await conn.commit()
 
     return ScoreResponse(
         score_text=score_text,
@@ -65,13 +60,13 @@ async def score_answer_stream(
             detail="AI_API_KEY is not set. Start the server with AI_API_KEY in the environment.",
         )
 
-    _part_order, _question_number, system_prompt, user_prompt = await run_in_threadpool(
-        scoring_service.score_context, request
+    _part_order, _question_number, system_prompt, user_prompt = await scoring_service.score_context(
+        request
     )
 
-    def stream_and_persist():
-        with db() as conn:
-            attempt_id = attempts_repo.insert_attempt(
+    async def stream_and_persist():
+        async with db() as conn:
+            attempt_id = await attempts_repo.insert_attempt(
                 conn,
                 user["id"],
                 request.study4_test_id,
@@ -81,12 +76,12 @@ async def score_answer_stream(
                 "streaming",
                 AI_MODEL,
             )
-            conn.commit()
+            await conn.commit()
 
         yield ai_service.sse_event("start", {"attempt_id": attempt_id})
 
         full_text = ""
-        for event in ai_service.ai_chat_stream(system_prompt, user_prompt):
+        async for event in ai_service.ai_chat_stream(system_prompt, user_prompt):
             if "event: done" in event:
                 continue
             if "event: error" in event:
@@ -95,9 +90,9 @@ async def score_answer_stream(
                     detail = json.loads(data_line).get("detail", "Scoring failed.")
                 except (IndexError, json.JSONDecodeError):
                     detail = "Scoring failed."
-                with db() as conn:
-                    attempts_repo.mark_error(conn, attempt_id, detail)
-                    conn.commit()
+                async with db() as conn:
+                    await attempts_repo.mark_error(conn, attempt_id, detail)
+                    await conn.commit()
                 yield ai_service.sse_event("error", {"detail": detail, "attempt_id": attempt_id})
                 return
             if "event: delta" in event:
@@ -108,9 +103,9 @@ async def score_answer_stream(
                     pass
             yield event
 
-        with db() as conn:
-            attempts_repo.mark_visible(conn, attempt_id, full_text)
-            conn.commit()
+        async with db() as conn:
+            await attempts_repo.mark_visible(conn, attempt_id, full_text)
+            await conn.commit()
         yield ai_service.sse_event("done", {"attempt_id": attempt_id})
 
     return StreamingResponse(

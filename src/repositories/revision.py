@@ -4,7 +4,7 @@ import json
 from typing import Any
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import RevisionItem
 from ..utils import now
@@ -43,17 +43,19 @@ def _assemble(row: RevisionItem) -> dict[str, Any]:
     }
 
 
-def list_revision(conn: Session, user_id: int) -> list[dict[str, Any]]:
-    rows = conn.execute(
-        select(RevisionItem)
-        .where(RevisionItem.user_id == user_id)
-        .order_by(RevisionItem.created_at.desc(), RevisionItem.id.desc())
+async def list_revision(conn: AsyncSession, user_id: int) -> list[dict[str, Any]]:
+    rows = (
+        await conn.execute(
+            select(RevisionItem)
+            .where(RevisionItem.user_id == user_id)
+            .order_by(RevisionItem.created_at.desc(), RevisionItem.id.desc())
+        )
     ).scalars().all()
     return [_assemble(row) for row in rows]
 
 
-def _find_existing(conn: Session, user_id: int, term: str) -> RevisionItem | None:
-    return conn.scalar(
+async def _find_existing(conn: AsyncSession, user_id: int, term: str) -> RevisionItem | None:
+    return await conn.scalar(
         select(RevisionItem).where(
             RevisionItem.user_id == user_id,
             func.lower(RevisionItem.term) == term.lower(),
@@ -68,7 +70,7 @@ def _image_field(image: dict[str, Any] | None, key: str) -> str | None:
     return str(value).strip() or None if value else None
 
 
-def upsert_revision(conn: Session, user_id: int, data: dict[str, Any]) -> dict[str, Any]:
+async def upsert_revision(conn: AsyncSession, user_id: int, data: dict[str, Any]) -> dict[str, Any]:
     term = str(data.get("term") or "").strip()
     if not term:
         raise ValueError("term is required")
@@ -81,7 +83,7 @@ def upsert_revision(conn: Session, user_id: int, data: dict[str, Any]) -> dict[s
 
     image = data.get("image") if isinstance(data.get("image"), dict) else None
 
-    row = _find_existing(conn, user_id, term)
+    row = await _find_existing(conn, user_id, term)
     created = False
     if row is None:
         row = RevisionItem(
@@ -116,16 +118,16 @@ def upsert_revision(conn: Session, user_id: int, data: dict[str, Any]) -> dict[s
             str(data.get("vietnamese_meaning") or "").strip() or None
         )
         row.synonyms = synonyms_json
-    conn.flush()
+    await conn.flush()
     payload = _assemble(row)
     payload["created"] = created
     return payload
 
 
-def find_revision_owned(
-    conn: Session, user_id: int, item_id: int
+async def find_revision_owned(
+    conn: AsyncSession, user_id: int, item_id: int
 ) -> RevisionItem | None:
-    return conn.scalar(
+    return await conn.scalar(
         select(RevisionItem).where(
             RevisionItem.id == item_id,
             RevisionItem.user_id == user_id,
@@ -133,21 +135,21 @@ def find_revision_owned(
     )
 
 
-def delete_revision(conn: Session, user_id: int, item_id: int) -> bool:
-    row = find_revision_owned(conn, user_id, item_id)
+async def delete_revision(conn: AsyncSession, user_id: int, item_id: int) -> bool:
+    row = await find_revision_owned(conn, user_id, item_id)
     if row is None:
         return False
-    conn.delete(row)
-    conn.flush()
+    await conn.delete(row)
+    await conn.flush()
     return True
 
 
-def mark_reviewed(
-    conn: Session, user_id: int, item_id: int, reviewed: bool = True
+async def mark_reviewed(
+    conn: AsyncSession, user_id: int, item_id: int, reviewed: bool = True
 ) -> dict[str, Any] | None:
-    row = find_revision_owned(conn, user_id, item_id)
+    row = await find_revision_owned(conn, user_id, item_id)
     if row is None:
         return None
     row.reviewed = 1 if reviewed else 0
-    conn.flush()
+    await conn.flush()
     return _assemble(row)

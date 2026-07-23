@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Generator
-from contextlib import contextmanager
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import Any
 
 from sqlalchemy import (
@@ -12,11 +12,17 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
-    create_engine,
     event,
     text,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
+from sqlalchemy.ext.asyncio import (
+    AsyncConnection,
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from .config import (
     DATABASE_URL,
@@ -33,6 +39,12 @@ def _normalize_database_url(url: str) -> str:
         return "postgresql+psycopg://" + url.removeprefix("postgres://")
     if url.startswith("postgresql://"):
         return "postgresql+psycopg://" + url.removeprefix("postgresql://")
+    if url.startswith("postgresql+psycopg://"):
+        return url
+    if url.startswith("sqlite:///") and not url.startswith("sqlite+"):
+        return "sqlite+aiosqlite://" + url.removeprefix("sqlite://")
+    if url.startswith("sqlite://"):
+        return "sqlite+aiosqlite://" + url.removeprefix("sqlite://")
     return url
 
 
@@ -41,7 +53,7 @@ IS_SQLITE = SQLALCHEMY_DATABASE_URL.startswith("sqlite")
 
 engine_args: dict[str, Any] = {"pool_pre_ping": DB_POOL_PRE_PING}
 if IS_SQLITE:
-    engine_args["connect_args"] = {"check_same_thread": False, "timeout": 10}
+    engine_args["connect_args"] = {"timeout": 10}
 else:
     engine_args.update(
         {
@@ -51,13 +63,13 @@ else:
         }
     )
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL, **engine_args)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+engine: AsyncEngine = create_async_engine(SQLALCHEMY_DATABASE_URL, **engine_args)
+SessionLocal = async_sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 
 if IS_SQLITE:
 
-    @event.listens_for(engine, "connect")
+    @event.listens_for(engine.sync_engine, "connect")
     def _set_sqlite_pragmas(dbapi_connection, _connection_record) -> None:
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys = ON")
@@ -417,18 +429,23 @@ class RevisionItem(Base):
     created_at: Mapped[str] = mapped_column(String, nullable=False)
 
 
-def _existing_columns(conn: Session, table_name: str) -> set[str]:
+async def _existing_columns_async(conn: AsyncConnection, table_name: str) -> set[str]:
     if IS_SQLITE:
-        rows = conn.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
+        rows = (await conn.execute(text(f"PRAGMA table_info({table_name})"))).fetchall()
         return {row[1] for row in rows}
-    rows = conn.execute(
-        text("SELECT column_name FROM information_schema.columns WHERE table_name = :t"),
-        {"t": table_name},
+    rows = (
+        await conn.execute(
+            text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = :t"
+            ),
+            {"t": table_name},
+        )
     ).fetchall()
     return {row[0] for row in rows}
 
 
-def _migrate() -> None:
+async def _migrate() -> None:
     additions = {
         "users": [
             ("google_id", "VARCHAR UNIQUE"),
@@ -447,14 +464,18 @@ def _migrate() -> None:
         ],
     }
     for table_name, columns in additions.items():
-        with engine.begin() as conn:
-            existing = _existing_columns(conn, table_name)
+        async with engine.begin() as conn:
+            existing = await _existing_columns_async(conn, table_name)
             for col_name, col_ddl in columns:
                 if col_name not in existing:
-                    conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_ddl}"))
+                    await conn.execute(
+                        text(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_ddl}")
+                    )
 
 
-def _insert_normalized_vocab(conn, vocab_id: int, data: dict[str, Any]) -> None:
+async def _insert_normalized_vocab(
+    conn: AsyncConnection, vocab_id: int, data: dict[str, Any]
+) -> None:
     categories = data.get("categories") or []
     for cat_idx, category in enumerate(categories):
         if not isinstance(category, dict):
@@ -462,7 +483,7 @@ def _insert_normalized_vocab(conn, vocab_id: int, data: dict[str, Any]) -> None:
         name = str(category.get("name") or "").strip()
         if not name:
             continue
-        result = conn.execute(
+        result = await conn.execute(
             text(
                 "INSERT INTO vocab_categories (vocab_table_id, name, sort_order) "
                 "VALUES (:v, :n, :s) RETURNING id"
@@ -478,7 +499,7 @@ def _insert_normalized_vocab(conn, vocab_id: int, data: dict[str, Any]) -> None:
             if not term:
                 continue
             image = item.get("image") if isinstance(item.get("image"), dict) else None
-            conn.execute(
+            await conn.execute(
                 text(
                     "INSERT INTO vocab_terms "
                     "(vocab_category_id, vocab_table_id, term, sort_order, "
@@ -498,22 +519,25 @@ def _insert_normalized_vocab(conn, vocab_id: int, data: dict[str, Any]) -> None:
             )
 
 
-def _migrate_vocab_payload() -> None:
-    with engine.begin() as conn:
-        if not _existing_columns(conn, "vocab_tables"):
+async def _migrate_vocab_payload() -> None:
+    async with engine.begin() as conn:
+        if not await _existing_columns_async(conn, "vocab_tables"):
             return
-        cols = _existing_columns(conn, "vocab_tables")
+        cols = await _existing_columns_async(conn, "vocab_tables")
         if "payload" not in cols:
             return
-        rows = conn.execute(text("SELECT id, payload FROM vocab_tables")).all()
+        rows = (await conn.execute(text("SELECT id, payload FROM vocab_tables"))).all()
         for vid, payload_json in rows:
             if not payload_json:
                 continue
-            already = conn.execute(
-                text(
-                    "SELECT 1 FROM vocab_categories WHERE vocab_table_id = :v LIMIT 1"
-                ),
-                {"v": vid},
+            already = (
+                await conn.execute(
+                    text(
+                        "SELECT 1 FROM vocab_categories "
+                        "WHERE vocab_table_id = :v LIMIT 1"
+                    ),
+                    {"v": vid},
+                )
             ).first()
             if already:
                 continue
@@ -521,68 +545,87 @@ def _migrate_vocab_payload() -> None:
                 data = json.loads(payload_json)
             except (json.JSONDecodeError, TypeError):
                 continue
-            _insert_normalized_vocab(conn, vid, data)
+            await _insert_normalized_vocab(conn, vid, data)
         try:
-            conn.execute(text("ALTER TABLE vocab_tables DROP COLUMN payload"))
+            await conn.execute(text("ALTER TABLE vocab_tables DROP COLUMN payload"))
         except Exception:
             pass
 
 
-def _migrate_vocab_attempt_optional() -> None:
+async def _migrate_vocab_attempt_optional() -> None:
     if IS_SQLITE:
         return
-    with engine.begin() as conn:
-        if not _existing_columns(conn, "vocab_tables"):
+    async with engine.begin() as conn:
+        if not await _existing_columns_async(conn, "vocab_tables"):
             return
-        cols = _existing_columns(conn, "vocab_tables")
+        cols = await _existing_columns_async(conn, "vocab_tables")
 
-        dupes = conn.execute(
-            text(
-                "SELECT user_id, study4_test_id, question_number, max(id) AS keep_id "
-                "FROM vocab_tables GROUP BY user_id, study4_test_id, question_number "
-                "HAVING count(*) > 1"
+        dupes = (
+            await conn.execute(
+                text(
+                    "SELECT user_id, study4_test_id, question_number, max(id) AS keep_id "
+                    "FROM vocab_tables GROUP BY user_id, study4_test_id, question_number "
+                    "HAVING count(*) > 1"
+                )
             )
         ).all()
         for user_id, test_id, q_number, keep_id in dupes:
-            stale = conn.execute(
-                text(
-                    "SELECT id FROM vocab_tables WHERE user_id = :u "
-                    "AND study4_test_id = :t AND question_number = :q AND id <> :k"
-                ),
-                {"u": user_id, "t": test_id, "q": q_number, "k": keep_id},
+            stale = (
+                await conn.execute(
+                    text(
+                        "SELECT id FROM vocab_tables WHERE user_id = :u "
+                        "AND study4_test_id = :t AND question_number = :q AND id <> :k"
+                    ),
+                    {"u": user_id, "t": test_id, "q": q_number, "k": keep_id},
+                )
             ).all()
             stale_ids = [row[0] for row in stale]
             if stale_ids:
-                conn.execute(
+                await conn.execute(
                     text("DELETE FROM vocab_terms WHERE vocab_table_id = ANY(:ids)"),
                     {"ids": stale_ids},
                 )
-                conn.execute(
-                    text("DELETE FROM vocab_categories WHERE vocab_table_id = ANY(:ids)"),
+                await conn.execute(
+                    text(
+                        "DELETE FROM vocab_categories WHERE vocab_table_id = ANY(:ids)"
+                    ),
                     {"ids": stale_ids},
                 )
-                conn.execute(text("DELETE FROM vocab_tables WHERE id = ANY(:ids)"), {"ids": stale_ids})
+                await conn.execute(
+                    text("DELETE FROM vocab_tables WHERE id = ANY(:ids)"),
+                    {"ids": stale_ids},
+                )
 
         if "attempt_id" in cols:
-            conn.execute(text("ALTER TABLE vocab_tables ALTER COLUMN attempt_id DROP NOT NULL"))
+            await conn.execute(
+                text("ALTER TABLE vocab_tables ALTER COLUMN attempt_id DROP NOT NULL")
+            )
 
-        old_constraint = conn.execute(
-            text(
-                "SELECT conname FROM pg_constraint WHERE conrelid = 'vocab_tables'::regclass "
-                "AND contype = 'u' AND conname = 'vocab_tables_attempt_id_key'"
+        old_constraint = (
+            await conn.execute(
+                text(
+                    "SELECT conname FROM pg_constraint "
+                    "WHERE conrelid = 'vocab_tables'::regclass "
+                    "AND contype = 'u' AND conname = 'vocab_tables_attempt_id_key'"
+                )
             )
         ).first()
         if old_constraint:
-            conn.execute(text("ALTER TABLE vocab_tables DROP CONSTRAINT vocab_tables_attempt_id_key"))
+            await conn.execute(
+                text("ALTER TABLE vocab_tables DROP CONSTRAINT vocab_tables_attempt_id_key")
+            )
 
-        new_constraint = conn.execute(
-            text(
-                "SELECT conname FROM pg_constraint WHERE conrelid = 'vocab_tables'::regclass "
-                "AND contype = 'u' AND conname = 'vocab_tables_uq_user_test_q'"
+        new_constraint = (
+            await conn.execute(
+                text(
+                    "SELECT conname FROM pg_constraint "
+                    "WHERE conrelid = 'vocab_tables'::regclass "
+                    "AND contype = 'u' AND conname = 'vocab_tables_uq_user_test_q'"
+                )
             )
         ).first()
         if not new_constraint:
-            conn.execute(
+            await conn.execute(
                 text(
                     "ALTER TABLE vocab_tables ADD CONSTRAINT vocab_tables_uq_user_test_q "
                     "UNIQUE (user_id, study4_test_id, question_number)"
@@ -590,27 +633,38 @@ def _migrate_vocab_attempt_optional() -> None:
             )
 
 
-def init_db() -> None:
+async def init_db() -> None:
     if IS_SQLITE:
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with engine.connect() as conn:
-            conn.exec_driver_sql("PRAGMA journal_mode = WAL")
-    Base.metadata.create_all(bind=engine)
-    _migrate()
-    _migrate_vocab_payload()
-    _migrate_vocab_attempt_optional()
+        async with engine.connect() as conn:
+            await conn.exec_driver_sql("PRAGMA journal_mode = WAL")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    await _migrate()
+    await _migrate_vocab_payload()
+    await _migrate_vocab_attempt_optional()
 
 
-def get_db() -> Generator[Session, None, None]:
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     session = SessionLocal()
     try:
         yield session
-        session.commit()
+        await session.commit()
     except Exception:
-        session.rollback()
+        await session.rollback()
         raise
     finally:
-        session.close()
+        await session.close()
 
 
-db = contextmanager(get_db)
+@asynccontextmanager
+async def db() -> AsyncGenerator[AsyncSession, None]:
+    session = SessionLocal()
+    try:
+        yield session
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise
+    finally:
+        await session.close()

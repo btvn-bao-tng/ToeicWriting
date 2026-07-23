@@ -1,13 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import re
-import urllib.error
 import urllib.parse
-import urllib.request
-from concurrent.futures import ThreadPoolExecutor
-from functools import lru_cache
 from typing import Any
+
+import httpx
 
 from ..config import PEXELS_API_KEY, PEXELS_SEARCH_TIMEOUT
 
@@ -20,45 +19,43 @@ def _normalize_query(query: str) -> str:
     return re.sub(r"\s+", " ", query or "").strip().lower()
 
 
-@lru_cache(maxsize=2048)
-def _cached_pexels_search(query: str) -> dict[str, Any] | None:
-    if not PEXELS_API_KEY:
-        return None
-    params = urllib.parse.urlencode(
-        {"query": query, "per_page": 1, "orientation": "landscape"}
-    )
-    request = urllib.request.Request(
-        f"{PEXELS_ENDPOINT}?{params}",
-        headers={
-            "Authorization": PEXELS_API_KEY,
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
-            "Accept": "application/json",
-        },
-        method="GET",
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=PEXELS_SEARCH_TIMEOUT) as response:
-            data = json.loads(response.read().decode("utf-8", errors="replace"))
-    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError):
-        return None
-
-    photos = data.get("photos") or []
-    if not photos:
-        return None
-    photo = photos[0]
+def _headers() -> dict[str, str]:
     return {
-        "url": photo["src"]["medium"],
-        "page_url": photo["url"],
-        "photographer": photo.get("photographer", ""),
-        "alt": photo.get("alt") or query,
+        "Authorization": PEXELS_API_KEY,
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+        ),
+        "Accept": "application/json",
     }
 
 
-def search_image(query: str) -> dict[str, Any] | None:
-    normalized = _normalize_query(query)
-    if not normalized:
-        return None
-    return _cached_pexels_search(normalized)
+async def _pexels_get(query: str, per_page: int) -> list[dict[str, Any]]:
+    if not PEXELS_API_KEY:
+        return []
+    params = urllib.parse.urlencode(
+        {"query": query, "per_page": per_page, "orientation": "landscape"}
+    )
+    try:
+        async with httpx.AsyncClient(timeout=PEXELS_SEARCH_TIMEOUT) as client:
+            response = await client.get(
+                f"{PEXELS_ENDPOINT}?{params}", headers=_headers()
+            )
+    except (httpx.HTTPError, ValueError):
+        return []
+
+    if response.status_code >= 400:
+        return []
+    try:
+        data = response.json()
+    except (json.JSONDecodeError, ValueError):
+        return []
+
+    return data.get("photos") or []
+
+
+_search_cache: dict[str, dict[str, Any] | None] = {}
+_search_set_cache: dict[tuple[str, int], tuple[dict[str, Any], ...]] = {}
 
 
 def _photo_to_dict(photo: dict[str, Any], fallback_query: str) -> dict[str, Any]:
@@ -70,43 +67,35 @@ def _photo_to_dict(photo: dict[str, Any], fallback_query: str) -> dict[str, Any]
     }
 
 
-@lru_cache(maxsize=1024)
-def _cached_pexels_search_many(query: str, count: int) -> tuple[dict[str, Any], ...]:
-    if not PEXELS_API_KEY:
-        return ()
-    params = urllib.parse.urlencode(
-        {"query": query, "per_page": count, "orientation": "landscape"}
-    )
-    request = urllib.request.Request(
-        f"{PEXELS_ENDPOINT}?{params}",
-        headers={
-            "Authorization": PEXELS_API_KEY,
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
-            "Accept": "application/json",
-        },
-        method="GET",
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=PEXELS_SEARCH_TIMEOUT) as response:
-            data = json.loads(response.read().decode("utf-8", errors="replace"))
-    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, ValueError):
-        return ()
-
-    photos = data.get("photos") or []
-    return tuple(_photo_to_dict(p, query) for p in photos[:count])
+async def search_image(query: str) -> dict[str, Any] | None:
+    normalized = _normalize_query(query)
+    if not normalized:
+        return None
+    if normalized in _search_cache:
+        return _search_cache[normalized]
+    photos = await _pexels_get(normalized, 1)
+    result = _photo_to_dict(photos[0], normalized) if photos else None
+    _search_cache[normalized] = result
+    return result
 
 
-def search_image_set(query: str, count: int = 4) -> list[dict[str, Any]]:
+async def search_image_set(query: str, count: int = 4) -> list[dict[str, Any]]:
     normalized = _normalize_query(query)
     if not normalized or count <= 0:
         return []
-    return list(_cached_pexels_search_many(normalized, count))
+    key = (normalized, count)
+    if key in _search_set_cache:
+        return list(_search_set_cache[key])
+    photos = await _pexels_get(normalized, count)
+    result = tuple(_photo_to_dict(p, normalized) for p in photos[:count])
+    _search_set_cache[key] = result
+    return list(result)
 
 
-def search_extra_images(
+async def search_extra_images(
     query: str, exclude_url: str | None = None, count: int = 2
 ) -> list[dict[str, Any]]:
-    pool = search_image_set(query, count + 2)
+    pool = await search_image_set(query, count + 2)
     extras: list[dict[str, Any]] = []
     seen: set[str] = set()
     for image in pool:
@@ -120,14 +109,14 @@ def search_extra_images(
     return extras
 
 
-def _search_for_term(term: str, topic: str) -> dict[str, Any] | None:
-    result = search_image(term)
+async def _search_for_term(term: str, topic: str) -> dict[str, Any] | None:
+    result = await search_image(term)
     if result is None and topic:
-        result = search_image(f"{topic} {term}")
+        result = await search_image(f"{topic} {term}")
     return result
 
 
-def attach_images(
+async def attach_images(
     categories: list[dict[str, Any]], topic: str
 ) -> list[dict[str, Any]]:
     jobs: list[tuple[int, int, str]] = []
@@ -143,16 +132,18 @@ def attach_images(
 
     results: dict[tuple[int, int], dict[str, Any] | None] = {}
     if jobs:
-        with ThreadPoolExecutor(max_workers=MAX_IMAGE_WORKERS) as executor:
-            futures = {
-                executor.submit(_search_for_term, term, topic): (cat_index, term_index)
-                for cat_index, term_index, term in jobs
-            }
-            for future, (cat_index, term_index) in futures.items():
+        semaphore = asyncio.Semaphore(MAX_IMAGE_WORKERS)
+
+        async def _bound_search(cat_index: int, term_index: int, term: str) -> None:
+            async with semaphore:
                 try:
-                    results[(cat_index, term_index)] = future.result()
+                    results[(cat_index, term_index)] = await _search_for_term(term, topic)
                 except Exception:
                     results[(cat_index, term_index)] = None
+
+        await asyncio.gather(
+            *(_bound_search(c, t, term) for c, t, term in jobs)
+        )
 
     out_categories: list[dict[str, Any]] = []
     for cat_index, category in enumerate(categories):

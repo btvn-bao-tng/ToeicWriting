@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from starlette.concurrency import run_in_threadpool
 
 from ..database import db
 from ..deps import require_user
@@ -17,11 +16,8 @@ router = APIRouter()
 async def list_revision(
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
-    def _load() -> list[dict[str, Any]]:
-        with db() as conn:
-            return revision_repo.list_revision(conn, user["id"])
-
-    items = await run_in_threadpool(_load)
+    async with db() as conn:
+        items = await revision_repo.list_revision(conn, user["id"])
     return {"items": items}
 
 
@@ -42,13 +38,10 @@ async def add_revision(
         "synonyms": request.synonyms,
     }
 
-    def _save() -> dict[str, Any]:
-        with db() as conn:
-            payload = revision_repo.upsert_revision(conn, user["id"], data)
-            conn.commit()
-        return payload
-
-    return await run_in_threadpool(_save)
+    async with db() as conn:
+        payload = await revision_repo.upsert_revision(conn, user["id"], data)
+        await conn.commit()
+    return payload
 
 
 @router.delete("/api/revision/{item_id}")
@@ -56,14 +49,11 @@ async def delete_revision(
     item_id: int,
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
-    def _delete() -> bool:
-        with db() as conn:
-            ok = revision_repo.delete_revision(conn, user["id"], item_id)
-            if ok:
-                conn.commit()
-            return ok
+    async with db() as conn:
+        ok = await revision_repo.delete_revision(conn, user["id"], item_id)
+        if ok:
+            await conn.commit()
 
-    ok = await run_in_threadpool(_delete)
     if not ok:
         raise HTTPException(status_code=404, detail="Revision item not found")
     return {"ok": True}
@@ -75,17 +65,14 @@ async def set_review_state(
     request: ReviewStateRequest,
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
-    def _save() -> dict[str, Any] | None:
-        with db() as conn:
-            payload = revision_repo.mark_reviewed(
-                conn, user["id"], item_id, request.reviewed
-            )
-            if payload is None:
-                return None
-            conn.commit()
-            return payload
+    async with db() as conn:
+        payload = await revision_repo.mark_reviewed(
+            conn,
+            user["id"],
+            item_id,
+            request.reviewed,
+        )
 
-    payload = await run_in_threadpool(_save)
     if payload is None:
         raise HTTPException(status_code=404, detail="Revision item not found")
     return payload

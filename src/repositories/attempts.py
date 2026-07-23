@@ -3,14 +3,14 @@ from __future__ import annotations
 from typing import Any
 
 from sqlalchemy import delete, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import Attempt
 from ..utils import now
 
 
-def find_attempt(conn: Session, attempt_id: int) -> dict[str, Any] | None:
-    attempt = conn.get(Attempt, attempt_id)
+async def find_attempt(conn: AsyncSession, attempt_id: int) -> dict[str, Any] | None:
+    attempt = await conn.get(Attempt, attempt_id)
     if attempt is None:
         return None
     return {
@@ -26,8 +26,8 @@ def find_attempt(conn: Session, attempt_id: int) -> dict[str, Any] | None:
     }
 
 
-def insert_attempt(
-    conn: Session,
+async def insert_attempt(
+    conn: AsyncSession,
     user_id: int,
     study4_test_id: int,
     question_number: int,
@@ -49,14 +49,14 @@ def insert_attempt(
         updated_at=timestamp,
     )
     conn.add(attempt)
-    conn.flush()
+    await conn.flush()
     return attempt.id
 
 
-def mark_visible(
-    conn: Session, attempt_id: int, score_text: str
+async def mark_visible(
+    conn: AsyncSession, attempt_id: int, score_text: str
 ) -> None:
-    attempt = conn.get(Attempt, attempt_id)
+    attempt = await conn.get(Attempt, attempt_id)
     if attempt is None:
         return
     attempt.score_text = score_text
@@ -64,10 +64,10 @@ def mark_visible(
     attempt.updated_at = now()
 
 
-def mark_error(
-    conn: Session, attempt_id: int, detail: str
+async def mark_error(
+    conn: AsyncSession, attempt_id: int, detail: str
 ) -> None:
-    attempt = conn.get(Attempt, attempt_id)
+    attempt = await conn.get(Attempt, attempt_id)
     if attempt is None:
         return
     attempt.score_state = "error"
@@ -75,8 +75,8 @@ def mark_error(
     attempt.updated_at = now()
 
 
-def list_attempts(
-    conn: Session, user_id: int, study4_test_id: int
+async def list_attempts(
+    conn: AsyncSession, user_id: int, study4_test_id: int
 ) -> list[dict[str, Any]]:
     latest_ids = (
         select(func.max(Attempt.id).label("id"))
@@ -84,30 +84,34 @@ def list_attempts(
         .group_by(Attempt.question_number)
     ).subquery()
 
-    rows = conn.execute(
-        select(
-            Attempt.id,
-            Attempt.question_number,
-            Attempt.answer,
-            Attempt.score_text,
-            Attempt.score_state,
-            Attempt.model,
-            Attempt.created_at,
+    rows = (
+        await conn.execute(
+            select(
+                Attempt.id,
+                Attempt.question_number,
+                Attempt.answer,
+                Attempt.score_text,
+                Attempt.score_state,
+                Attempt.model,
+                Attempt.created_at,
+            )
+            .join(latest_ids, Attempt.id == latest_ids.c.id)
+            .order_by(Attempt.question_number)
         )
-        .join(latest_ids, Attempt.id == latest_ids.c.id)
-        .order_by(Attempt.question_number)
     ).all()
     return [dict(row._mapping) for row in rows]
 
 
-def normalize_streaming(
-    conn: Session, user_id: int
+async def normalize_streaming(
+    conn: AsyncSession, user_id: int
 ) -> None:
-    rows = conn.scalars(
-        select(Attempt).where(
-            Attempt.user_id == user_id,
-            Attempt.score_state == "streaming",
-            Attempt.score_text == "",
+    rows = (
+        await conn.scalars(
+            select(Attempt).where(
+                Attempt.user_id == user_id,
+                Attempt.score_state == "streaming",
+                Attempt.score_text == "",
+            )
         )
     ).all()
     timestamp = now()
@@ -117,13 +121,13 @@ def normalize_streaming(
         attempt.updated_at = timestamp
 
 
-def delete_attempts_for_question(
-    conn: Session,
+async def delete_attempts_for_question(
+    conn: AsyncSession,
     user_id: int,
     study4_test_id: int,
     question_number: int,
 ) -> None:
-    conn.execute(
+    await conn.execute(
         delete(Attempt).where(
             Attempt.user_id == user_id,
             Attempt.study4_test_id == study4_test_id,
