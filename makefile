@@ -1,17 +1,16 @@
-.PHONY: server dev install build lint clean
+.PHONY: server dev install lint clean
 
 install:
 	pip install -r requirements.txt
-	npm install
 
-build:
-	npm run build
-
-server: build
+server:
 	uvicorn src.main:app --host 0.0.0.0 --port 8000
 
 dev:
 	uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 
+lint:
+	python -c "import src.main" && echo "OK"
+
 clean:
-	rm -rf node_modules src/static/dist __pycache__ src/**/__pycache__
+	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true

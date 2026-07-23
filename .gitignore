@@ -39,8 +39,4 @@ data/database.backup-*.db
 # Edge TTS audio cache
 data/tts_cache/
 
-# Node.js
-node_modules/
-src/static/dist/
-
 zdraft/*

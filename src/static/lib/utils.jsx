@@ -1,5 +1,17 @@
 window.TW = window.TW || {};
 
+window.TW.sanitizeHtml = function sanitizeHtml(html) {
+  if (typeof DOMPurify === "undefined") return html || "";
+  return DOMPurify.sanitize(html || "", {
+    ALLOWED_TAGS: [
+      "p", "br", "b", "i", "em", "strong", "u", "a", "img", "ul", "ol", "li",
+      "h1", "h2", "h3", "h4", "h5", "h6", "span", "div", "blockquote", "code",
+      "pre", "hr", "table", "thead", "tbody", "tr", "td", "th", "sub", "sup",
+    ],
+    ALLOWED_ATTR: ["href", "src", "alt", "title", "class", "target", "rel", "width", "height"],
+  });
+};
+
 const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action-focus focus-visible:ring-offset-2";
 
 window.TW.classes = {
